@@ -15,7 +15,13 @@ This package implements a team protocol for agents working together on a project
 ## Installation
 
 ```bash
-pi install github.com/burggraf/pi-teams
+pi install npm:pi-teams
+```
+
+Or from GitHub:
+
+```bash
+pi install github:burggraf/pi-teams
 ```
 
 ## Getting Started (Quick Start)

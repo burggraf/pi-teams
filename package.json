@@ -3,8 +3,17 @@
   "version": "0.1.0",
   "description": "Agent teams for pi, ported from claude-code-teams-mcp",
   "repository": "github:burggraf/pi-teams",
+  "author": "Mark Burggraf",
+  "license": "MIT",
   "keywords": ["pi-package"],
   "main": "extensions/index.ts",
+  "files": [
+    "extensions",
+    "skills",
+    "src",
+    "package.json",
+    "README.md"
+  ],
   "dependencies": {
     "uuid": "^11.1.0"
   },
