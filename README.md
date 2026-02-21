@@ -58,12 +58,17 @@ tmux
 ```
 Then start `pi` inside that window.
 
-### 3. Pro-Tip: Navigating Panes
-When your screen splits into multiple agents:
-- **Click to Switch**: Simply click your mouse on any pane to focus that agent.
-- **Easy Switching**: Hold `Alt` and use the **Arrow Keys** to move between agents.
-- **Scroll History**: Use your mouse wheel to scroll up and see what an agent did earlier.
-- **Keyboard Fallback**: Press `Ctrl+a` then `o` to cycle through agents.
+### 3. Navigating Panes (Vanilla tmux)
+When your screen splits into multiple agents, you use "Prefix" commands to move around. By default, the prefix is **`Ctrl+b`**.
+
+- **Switch to next agent**: Press `Ctrl+b` then `o`.
+- **Switch using arrows**: Press `Ctrl+b` then any **Arrow Key**.
+- **How to Scroll**: Vanilla tmux does not use the mouse wheel by default.
+    1. Press `Ctrl+b` then `[` to enter "Copy Mode".
+    2. Use your **Arrow Keys** or **Page Up/Down** to scroll.
+    3. Press `q` to exit scroll mode and go back to typing.
+
+*Note: You can greatly improve this experience by enabling "mouse mode" in your `~/.tmux.conf` file.*
 
 ---
 
