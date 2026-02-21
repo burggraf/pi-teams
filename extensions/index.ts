@@ -18,6 +18,10 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     paths.ensureDirs();
     if (isTeammate) {
+      if (teamName) {
+        const pidFile = path.join(paths.teamDir(teamName), `${agentName}.pid`);
+        fs.writeFileSync(pidFile, process.pid.toString());
+      }
       ctx.ui.notify(`Teammate: ${agentName} (Team: ${teamName})`, "info");
       // Use a shorter, more prominent status at the beginning if possible
       ctx.ui.setStatus("00-pi-teams", `[${agentName.toUpperCase()}]`); 
@@ -119,6 +123,7 @@ export default function (pi: ExtensionAPI) {
             "run", 
             "--name", safeName, 
             "--cwd", params.cwd, 
+            "--close-on-exit",
             "--", 
             "env", `PI_TEAM_NAME=${safeTeamName}`, `PI_AGENT_NAME=${safeName}`,
             "sh", "-c", piBinary
@@ -309,11 +314,21 @@ export default function (pi: ExtensionAPI) {
       const config = await teams.readConfig(params.team_name);
       const member = config.members.find(m => m.name === params.agent_name);
       if (!member) throw new Error(`Teammate ${params.agent_name} not found`);
+      
+      const pidFile = path.join(paths.teamDir(params.team_name), `${params.agent_name}.pid`);
+      if (fs.existsSync(pidFile)) {
+        try {
+          const pid = fs.readFileSync(pidFile, "utf-8").trim();
+          execSync(`kill -9 ${pid}`);
+          fs.unlinkSync(pidFile);
+        } catch (e) {
+          // ignore if process already dead
+        }
+      }
+
       if (member.tmuxPaneId) {
         try {
-          if (member.tmuxPaneId.startsWith("zellij_")) {
-            // zellij doesn't easily support closing a specific pane by name yet
-          } else {
+          if (!member.tmuxPaneId.startsWith("zellij_")) {
             execSync(`tmux kill-pane -t ${member.tmuxPaneId}`);
           }
         } catch (e) {
