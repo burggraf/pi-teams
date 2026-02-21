@@ -37,10 +37,17 @@ You don't need to learn complex code commands. Just talk to Pi in plain English!
 ### 3. Assign a Task
 > **You:** "Create a task for security-bot: 'Check the .env.example file for sensitive defaults' and set it to in_progress."
 
-### 4. Check on Progress
-> **You:** "How is the team doing? Check my inbox for any messages from security-bot."
+### 4. Send a Message
+> **You:** "Tell security-bot to focus on the 'config/' directory first."
+> *The lead agent uses `send_message` to put an instruction in the teammate's inbox.*
 
-### 5. Shut Down the Team
+### 5. Inter-Agent Communication
+> Teammates can also talk to each other! For example, a `frontend-bot` can message a `backend-bot` to coordinate on an API schema without your intervention.
+
+### 6. Check on Progress
+> **You:** "How is the team doing? List all tasks and check my inbox for any messages."
+
+### 7. Shut Down the Team
 > **You:** "We're done. Shut down the team and close the panes."
 
 ---
