@@ -2,6 +2,8 @@
 
 **pi-teams** turns your single Pi agent into a coordinated software engineering team. It allows you to spawn multiple "Teammate" agents in separate terminal panes that work autonomously, communicate with each other, and manage a shared task board—all mediated through **tmux**.
 
+<a href="pi-team-in-action.png"><img src="pi-team-in-action.png" width="600" alt="pi-teams in action"></a>
+
 ## 🛠 Installation
 
 Open your Pi terminal and type:
