@@ -1,11 +1,13 @@
 {
   "name": "pi-teams",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Agent teams for pi, ported from claude-code-teams-mcp",
   "repository": "github:burggraf/pi-teams",
   "author": "Mark Burggraf",
   "license": "MIT",
-  "keywords": ["pi-package"],
+  "keywords": [
+    "pi-package"
+  ],
   "main": "extensions/index.ts",
   "files": [
     "extensions",
@@ -23,7 +25,17 @@
   },
   "pi": {
     "image": "https://raw.githubusercontent.com/burggraf/pi-teams/main/pi-team-in-action.png",
-    "extensions": ["extensions/index.ts"],
-    "skills": ["skills"]
+    "extensions": [
+      "extensions/index.ts"
+    ],
+    "skills": [
+      "skills"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   }
 }

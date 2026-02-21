@@ -45,22 +45,59 @@ You don't need to learn complex code commands. Just talk to Pi in plain English!
 
 ---
 
-## 🪟 Requirement: tmux
+## 🛠 Available Tools
 
-To show multiple agents on one screen, **pi-teams** requires `tmux` (a terminal multiplexer).
+Pi automatically uses these tools when you give instructions like the examples above.
 
-### 1. Install tmux
+### Team Management
+- `team_create`: Start a new team.
+- `team_delete`: Delete a team and its data.
+- `read_config`: Get details about the team and its members.
+
+### Teammates
+- `spawn_teammate`: Launch a new agent into a `tmux` pane with a role and instructions.
+- `check_teammate`: See if a teammate is still running or has unread messages.
+- `force_kill_teammate`: Stop a teammate and remove them from the team.
+- `process_shutdown_approved`: Orderly shutdown for a finished teammate.
+
+### Task Management
+- `task_create`: Create a new task.
+- `task_list`: List all tasks and their current status.
+- `task_get`: Get full details of a specific task.
+- `task_update`: Update a task's status or owner.
+
+### Messaging
+- `send_message`: Send a message to a teammate or lead.
+- `read_inbox`: Read incoming messages for an agent.
+
+---
+
+## 🤖 Automated Behavior
+
+- **Initial Greeting**: When a teammate is spawned, they will automatically send a message saying they've started and are checking their inbox.
+- **Idle Polling**: Teammates check for new messages every 30 seconds if they are idle.
+- **Context Injection**: Each teammate is given a custom system prompt that defines their role and instructions for the team environment.
+
+---
+
+## 🪟 Requirements: tmux or Zellij
+
+To show multiple agents on one screen, **pi-teams** requires a terminal multiplexer. It supports both **tmux** and **Zellij**.
+
+### Option 1: tmux (Recommended)
+
+#### 1. Install tmux
 - **macOS**: `brew install tmux`
 - **Linux**: `sudo apt install tmux`
 
-### 2. How to run it
+#### 2. How to run it
 Before you start a team, you **must** be inside a tmux session. Simply type:
 ```bash
 tmux
 ```
 Then start `pi` inside that window.
 
-### 3. Navigating Panes (Vanilla tmux)
+#### 3. Navigating Panes (Vanilla tmux)
 When your screen splits into multiple agents, you use "Prefix" commands to move around. By default, the prefix is **`Ctrl+b`**.
 
 - **Switch to next agent**: Press `Ctrl+b` then `o`.
@@ -71,6 +108,13 @@ When your screen splits into multiple agents, you use "Prefix" commands to move 
     3. Press `q` to exit scroll mode and go back to typing.
 
 *Note: You can greatly improve this experience by enabling "mouse mode" in your `~/.tmux.conf` file.*
+
+### Option 2: Zellij
+
+If you prefer **Zellij**, simply start `pi` inside a Zellij session. **pi-teams** will detect it via the `ZELLIJ` environment variable and use `zellij run` to spawn teammates in new panes.
+
+- **Switching Panes**: Use `Alt` + `Arrow Keys` (default) to move between agent panes.
+- **Closing Panes**: Use `Ctrl+t` then `p` then `x` (or your configured shortcut) to close a teammate pane if needed, though `force_kill_teammate` is recommended.
 
 ---
 
