@@ -66,6 +66,49 @@ export default function (pi: ExtensionAPI) {
     }
   });
 
+  async function killTeammate(teamName: string, member: Member) {
+    if (member.name === "team-lead") return;
+
+    const pidFile = path.join(paths.teamDir(teamName), `${member.name}.pid`);
+    if (fs.existsSync(pidFile)) {
+      try {
+        const pid = fs.readFileSync(pidFile, "utf-8").trim();
+        process.kill(parseInt(pid), "SIGKILL");
+        fs.unlinkSync(pidFile);
+      } catch (e) {
+        // ignore if process already dead
+      }
+    }
+
+    if (member.tmuxPaneId) {
+      try {
+        if (member.tmuxPaneId.startsWith("iterm_")) {
+          const itermId = member.tmuxPaneId.replace("iterm_", "");
+          const script = `tell application "iTerm2"
+  repeat with aWindow in windows
+    repeat with aTab in tabs of aWindow
+      repeat with aSession in sessions of aTab
+        if id of aSession is "${itermId}" then
+          close aSession
+          return "Closed"
+        end if
+      end repeat
+    end repeat
+  end repeat
+end tell`;
+          spawnSync("osascript", ["-e", script]);
+        } else if (member.tmuxPaneId.startsWith("zellij_")) {
+          // Zellij is expected to close on process exit (using --close-on-exit)
+        } else {
+          // Use -t with the pane_id
+          spawnSync("tmux", ["kill-pane", "-t", member.tmuxPaneId.trim()]);
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+  }
+
   // Tools
   pi.registerTool({
     name: "team_create",
@@ -278,12 +321,25 @@ end tell`;
       team_name: Type.String(),
     }),
     async execute(toolCallId, params, signal, onUpdate, ctx) {
-      const dir = paths.teamDir(params.team_name);
-      const tasksDir = paths.taskDir(params.team_name);
+      const teamName = params.team_name;
+      try {
+        const config = await teams.readConfig(teamName);
+        for (const member of config.members) {
+          if (member.name !== "team-lead") {
+            ctx.ui.notify(`Stopping teammate: ${member.name}`, "info");
+            await killTeammate(teamName, member);
+          }
+        }
+      } catch (e) {
+        // config might not exist, ignore
+      }
+
+      const dir = paths.teamDir(teamName);
+      const tasksDir = paths.taskDir(teamName);
       if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true });
       if (fs.existsSync(tasksDir)) fs.rmSync(tasksDir, { recursive: true });
       return {
-        content: [{ type: "text", text: `Team ${params.team_name} deleted.` }],
+        content: [{ type: "text", text: `Team ${teamName} deleted.` }],
       };
     },
   });
@@ -334,41 +390,8 @@ end tell`;
       const member = config.members.find(m => m.name === params.agent_name);
       if (!member) throw new Error(`Teammate ${params.agent_name} not found`);
       
-      const pidFile = path.join(paths.teamDir(params.team_name), `${params.agent_name}.pid`);
-      if (fs.existsSync(pidFile)) {
-        try {
-          const pid = fs.readFileSync(pidFile, "utf-8").trim();
-          execSync(`kill -9 ${pid}`);
-          fs.unlinkSync(pidFile);
-        } catch (e) {
-          // ignore if process already dead
-        }
-      }
+      await killTeammate(params.team_name, member);
 
-      if (member.tmuxPaneId) {
-        try {
-          if (member.tmuxPaneId.startsWith("iterm_")) {
-            const itermId = member.tmuxPaneId.replace("iterm_", "");
-            const script = `tell application "iTerm2"
-  repeat with aWindow in windows
-    repeat with aTab in tabs of aWindow
-      repeat with aSession in sessions of aTab
-        if id of aSession is "${itermId}" then
-          close aSession
-          return "Closed"
-        end if
-      end repeat
-    end repeat
-  end repeat
-end tell`;
-            spawnSync("osascript", ["-e", script]);
-          } else if (!member.tmuxPaneId.startsWith("zellij_")) {
-            execSync(`tmux kill-pane -t ${member.tmuxPaneId}`);
-          }
-        } catch (e) {
-          // ignore
-        }
-      }
       await teams.removeMember(params.team_name, params.agent_name);
       await tasks.resetOwnerTasks(params.team_name, params.agent_name);
       return {
@@ -441,32 +464,9 @@ end tell`;
       const config = await teams.readConfig(params.team_name);
       const member = config.members.find(m => m.name === params.agent_name);
       if (!member) throw new Error(`Teammate ${params.agent_name} not found`);
-      if (member.tmuxPaneId) {
-        try {
-          if (member.tmuxPaneId.startsWith("zellij_")) {
-            // zellij doesn't easily support closing a specific pane by name yet
-          } else if (member.tmuxPaneId.startsWith("iterm_")) {
-            const itermId = member.tmuxPaneId.replace("iterm_", "");
-            const script = `tell application "iTerm2"
-  repeat with aWindow in windows
-    repeat with aTab in tabs of aWindow
-      repeat with aSession in sessions of aTab
-        if id of aSession is "${itermId}" then
-          close aSession
-          return "Closed"
-        end if
-      end repeat
-    end repeat
-  end repeat
-end tell`;
-            spawnSync("osascript", ["-e", script]);
-          } else {
-            execSync(`tmux kill-pane -t ${member.tmuxPaneId}`);
-          }
-        } catch (e) {
-          // ignore
-        }
-      }
+
+      await killTeammate(params.team_name, member);
+
       await teams.removeMember(params.team_name, params.agent_name);
       await tasks.resetOwnerTasks(params.team_name, params.agent_name);
       return {
