@@ -60,8 +60,10 @@ Then start `pi` inside that window.
 
 ### 3. Pro-Tip: Navigating Panes
 When your screen splits into multiple agents:
-- **Switch between agents**: Press `Ctrl+a` then `o`.
-- **Scroll up to see history**: Use your mouse wheel (scrolling is enabled by default in our config!).
+- **Click to Switch**: Simply click your mouse on any pane to focus that agent.
+- **Easy Switching**: Hold `Alt` and use the **Arrow Keys** to move between agents.
+- **Scroll History**: Use your mouse wheel to scroll up and see what an agent did earlier.
+- **Keyboard Fallback**: Press `Ctrl+a` then `o` to cycle through agents.
 
 ---
 
