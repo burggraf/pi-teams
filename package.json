@@ -1,0 +1,18 @@
+{
+  "name": "pi-teams",
+  "version": "0.1.0",
+  "description": "Agent teams for pi, ported from claude-code-teams-mcp",
+  "keywords": ["pi-package"],
+  "main": "extensions/index.ts",
+  "dependencies": {
+    "uuid": "^11.1.0"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@sinclair/typebox": "*"
+  },
+  "pi": {
+    "extensions": ["extensions/index.ts"],
+    "skills": ["skills"]
+  }
+}
