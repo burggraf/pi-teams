@@ -8,6 +8,9 @@
   "keywords": [
     "pi-package"
   ],
+  "scripts": {
+    "test": "vitest run"
+  },
   "main": "extensions/index.ts",
   "files": [
     "extensions",

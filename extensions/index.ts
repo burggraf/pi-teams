@@ -6,7 +6,7 @@ import * as teams from "../src/utils/teams";
 import * as tasks from "../src/utils/tasks";
 import * as messaging from "../src/utils/messaging";
 import { Member } from "../src/utils/models";
-import { execSync } from "node:child_process";
+import { execSync, spawnSync } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
 
@@ -24,7 +24,7 @@ export default function (pi: ExtensionAPI) {
       
       // Also set the tmux pane title for better visibility
       try {
-        execSync(`tmux select-pane -T "${agentName}"`);
+        spawnSync("tmux", ["select-pane", "-T", agentName]);
       } catch (e) {
         // ignore
       }
@@ -87,13 +87,16 @@ export default function (pi: ExtensionAPI) {
       cwd: Type.String(),
     }),
     async execute(toolCallId, params, signal, onUpdate, ctx) {
-      if (!teams.teamExists(params.team_name)) {
+      const safeName = paths.sanitizeName(params.name);
+      const safeTeamName = paths.sanitizeName(params.team_name);
+
+      if (!teams.teamExists(safeTeamName)) {
         throw new Error(`Team ${params.team_name} does not exist`);
       }
 
       const member: Member = {
-        agentId: `${params.name}@${params.team_name}`,
-        name: params.name,
+        agentId: `${safeName}@${safeTeamName}`,
+        name: safeName,
         agentType: "teammate",
         model: "sonnet",
         joinedAt: Date.now(),
@@ -104,19 +107,40 @@ export default function (pi: ExtensionAPI) {
         color: "blue",
       };
 
-      await teams.addMember(params.team_name, member);
-      await messaging.sendPlainMessage(params.team_name, "team-lead", params.name, params.prompt, "Initial prompt");
+      await teams.addMember(safeTeamName, member);
+      await messaging.sendPlainMessage(safeTeamName, "team-lead", safeName, params.prompt, "Initial prompt");
 
       const piBinary = process.argv[1] ? `node ${process.argv[1]}` : "pi"; // Assumed on path
-      const cmd = `PI_TEAM_NAME=${params.team_name} PI_AGENT_NAME=${params.name} ${piBinary}`;
       
       let paneId = "";
       try {
-        const tmuxCmd = `tmux split-window -h -dP -F "#{pane_id}" "cd ${params.cwd} && ${cmd}"`;
-        paneId = execSync(tmuxCmd).toString().trim();
-        execSync(`tmux select-layout even-horizontal`);
+        if (process.env.ZELLIJ && !process.env.TMUX) {
+          const zellijArgs = [
+            "run", 
+            "--name", safeName, 
+            "--cwd", params.cwd, 
+            "--", 
+            "env", `PI_TEAM_NAME=${safeTeamName}`, `PI_AGENT_NAME=${safeName}`,
+            "sh", "-c", piBinary
+          ];
+          spawnSync("zellij", zellijArgs);
+          paneId = `zellij_${safeName}`;
+        } else {
+          const tmuxArgs = [
+            "split-window", 
+            "-h", "-dP", 
+            "-F", "#{pane_id}", 
+            "-c", params.cwd, 
+            "env", `PI_TEAM_NAME=${safeTeamName}`, `PI_AGENT_NAME=${safeName}`,
+            "sh", "-c", piBinary
+          ];
+          const result = spawnSync("tmux", tmuxArgs);
+          if (result.status !== 0) throw new Error(`tmux failed with status ${result.status}: ${result.stderr.toString()}`);
+          paneId = result.stdout.toString().trim();
+          spawnSync("tmux", ["select-layout", "even-horizontal"]);
+        }
       } catch (e) {
-        throw new Error(`Failed to spawn tmux pane: ${e}`);
+        throw new Error(`Failed to spawn ${process.env.ZELLIJ && !process.env.TMUX ? "zellij" : "tmux"} pane: ${e}`);
       }
 
       // Update member with paneId
@@ -287,7 +311,11 @@ export default function (pi: ExtensionAPI) {
       if (!member) throw new Error(`Teammate ${params.agent_name} not found`);
       if (member.tmuxPaneId) {
         try {
-          execSync(`tmux kill-pane -t ${member.tmuxPaneId}`);
+          if (member.tmuxPaneId.startsWith("zellij_")) {
+            // zellij doesn't easily support closing a specific pane by name yet
+          } else {
+            execSync(`tmux kill-pane -t ${member.tmuxPaneId}`);
+          }
         } catch (e) {
           // ignore
         }
@@ -316,8 +344,13 @@ export default function (pi: ExtensionAPI) {
       let alive = false;
       if (member.tmuxPaneId) {
         try {
-          execSync(`tmux has-session -t ${member.tmuxPaneId}`);
-          alive = true;
+          if (member.tmuxPaneId.startsWith("zellij_")) {
+            // Assume alive if it's zellij for now
+            alive = true;
+          } else {
+            execSync(`tmux has-session -t ${member.tmuxPaneId}`);
+            alive = true;
+          }
         } catch (e) {
           alive = false;
         }
@@ -346,7 +379,11 @@ export default function (pi: ExtensionAPI) {
       if (!member) throw new Error(`Teammate ${params.agent_name} not found`);
       if (member.tmuxPaneId) {
         try {
-          execSync(`tmux kill-pane -t ${member.tmuxPaneId}`);
+          if (member.tmuxPaneId.startsWith("zellij_")) {
+            // zellij doesn't easily support closing a specific pane by name yet
+          } else {
+            execSync(`tmux kill-pane -t ${member.tmuxPaneId}`);
+          }
         } catch (e) {
           // ignore
         }

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { TaskFile } from "./models";
-import { taskDir } from "./paths";
+import { taskDir, sanitizeName } from "./paths";
 import { teamExists } from "./teams";
 import { withLock } from "./lock";
 
@@ -48,10 +48,10 @@ export async function updateTask(
   updates: Partial<TaskFile>
 ): Promise<TaskFile> {
   const dir = taskDir(teamName);
-  const lockPath = path.join(dir, taskId);
-  const p = path.join(dir, `${taskId}.json`);
+  const safeTaskId = sanitizeName(taskId);
+  const p = path.join(dir, `${safeTaskId}.json`);
 
-  return await withLock(lockPath, async () => {
+  return await withLock(p, async () => {
     if (!fs.existsSync(p)) throw new Error(`Task ${taskId} not found`);
     const task: TaskFile = JSON.parse(fs.readFileSync(p, "utf-8"));
     const updated = { ...task, ...updates };
@@ -68,7 +68,8 @@ export async function updateTask(
 
 export async function readTask(teamName: string, taskId: string): Promise<TaskFile> {
   const dir = taskDir(teamName);
-  const p = path.join(dir, `${taskId}.json`);
+  const safeTaskId = sanitizeName(taskId);
+  const p = path.join(dir, `${safeTaskId}.json`);
   if (!fs.existsSync(p)) throw new Error(`Task ${taskId} not found`);
   return await withLock(p, async () => {
     return JSON.parse(fs.readFileSync(p, "utf-8"));
