@@ -1,6 +1,6 @@
 {
   "name": "pi-teams",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Agent teams for pi, ported from claude-code-teams-mcp",
   "repository": "github:burggraf/pi-teams",
   "author": "Mark Burggraf",
