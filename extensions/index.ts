@@ -28,7 +28,11 @@ export default function (pi: ExtensionAPI) {
       
       // Also set the tmux pane title for better visibility
       try {
-        spawnSync("tmux", ["select-pane", "-T", agentName]);
+        if (process.env.TMUX) {
+          spawnSync("tmux", ["select-pane", "-T", agentName]);
+        } else if (process.env.TERM_PROGRAM === "iTerm.app") {
+          spawnSync("osascript", ["-e", `tell application "iTerm2" to tell current session of current window to set name to "${agentName}"`]);
+        }
       } catch (e) {
         // ignore
       }
@@ -130,6 +134,20 @@ export default function (pi: ExtensionAPI) {
           ];
           spawnSync("zellij", zellijArgs);
           paneId = `zellij_${safeName}`;
+        } else if (process.env.TERM_PROGRAM === "iTerm.app" && !process.env.TMUX && !process.env.ZELLIJ) {
+          const itermCmd = `cd ${params.cwd} && PI_TEAM_NAME=${safeTeamName} PI_AGENT_NAME=${safeName} ${piBinary}`;
+          const script = `tell application "iTerm2"
+  tell current session of current window
+    set newSession to split horizontally with default profile
+    tell newSession
+      write text "${itermCmd.replace(/"/g, '\\"')}"
+      return id
+    end tell
+  end tell
+end tell`;
+          const result = spawnSync("osascript", ["-e", script]);
+          if (result.status !== 0) throw new Error(`osascript failed with status ${result.status}: ${result.stderr.toString()}`);
+          paneId = `iterm_${result.stdout.toString().trim()}`;
         } else {
           const tmuxArgs = [
             "split-window", 
@@ -145,8 +163,9 @@ export default function (pi: ExtensionAPI) {
           spawnSync("tmux", ["select-layout", "even-horizontal"]);
         }
       } catch (e) {
-        throw new Error(`Failed to spawn ${process.env.ZELLIJ && !process.env.TMUX ? "zellij" : "tmux"} pane: ${e}`);
+        throw new Error(`Failed to spawn ${process.env.ZELLIJ && !process.env.TMUX ? "zellij" : (process.env.TERM_PROGRAM === "iTerm.app" ? "iTerm2" : "tmux")} pane: ${e}`);
       }
+
 
       // Update member with paneId
       await teams.updateMember(params.team_name, params.name, { tmuxPaneId: paneId });
@@ -328,7 +347,22 @@ export default function (pi: ExtensionAPI) {
 
       if (member.tmuxPaneId) {
         try {
-          if (!member.tmuxPaneId.startsWith("zellij_")) {
+          if (member.tmuxPaneId.startsWith("iterm_")) {
+            const itermId = member.tmuxPaneId.replace("iterm_", "");
+            const script = `tell application "iTerm2"
+  repeat with aWindow in windows
+    repeat with aTab in tabs of aWindow
+      repeat with aSession in sessions of aTab
+        if id of aSession is "${itermId}" then
+          close aSession
+          return "Closed"
+        end if
+      end repeat
+    end repeat
+  end repeat
+end tell`;
+            spawnSync("osascript", ["-e", script]);
+          } else if (!member.tmuxPaneId.startsWith("zellij_")) {
             execSync(`tmux kill-pane -t ${member.tmuxPaneId}`);
           }
         } catch (e) {
@@ -362,6 +396,21 @@ export default function (pi: ExtensionAPI) {
           if (member.tmuxPaneId.startsWith("zellij_")) {
             // Assume alive if it's zellij for now
             alive = true;
+          } else if (member.tmuxPaneId.startsWith("iterm_")) {
+            const itermId = member.tmuxPaneId.replace("iterm_", "");
+            const script = `tell application "iTerm2"
+  repeat with aWindow in windows
+    repeat with aTab in tabs of aWindow
+      repeat with aSession in sessions of aTab
+        if id of aSession is "${itermId}" then
+          return "Alive"
+        end if
+      end repeat
+    end repeat
+  end repeat
+end tell`;
+            const result = spawnSync("osascript", ["-e", script]);
+            alive = result.stdout.toString().includes("Alive");
           } else {
             execSync(`tmux has-session -t ${member.tmuxPaneId}`);
             alive = true;
@@ -396,6 +445,21 @@ export default function (pi: ExtensionAPI) {
         try {
           if (member.tmuxPaneId.startsWith("zellij_")) {
             // zellij doesn't easily support closing a specific pane by name yet
+          } else if (member.tmuxPaneId.startsWith("iterm_")) {
+            const itermId = member.tmuxPaneId.replace("iterm_", "");
+            const script = `tell application "iTerm2"
+  repeat with aWindow in windows
+    repeat with aTab in tabs of aWindow
+      repeat with aSession in sessions of aTab
+        if id of aSession is "${itermId}" then
+          close aSession
+          return "Closed"
+        end if
+      end repeat
+    end repeat
+  end repeat
+end tell`;
+            spawnSync("osascript", ["-e", script]);
           } else {
             execSync(`tmux kill-pane -t ${member.tmuxPaneId}`);
           }

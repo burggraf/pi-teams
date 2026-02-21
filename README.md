@@ -80,9 +80,9 @@ Pi automatically uses these tools when you give instructions like the examples a
 
 ---
 
-## 🪟 Requirements: tmux or Zellij
+## 🪟 Terminal Requirements: tmux, Zellij, or iTerm2
 
-To show multiple agents on one screen, **pi-teams** requires a terminal multiplexer. It supports both **tmux** and **Zellij**.
+To show multiple agents on one screen, **pi-teams** requires a way to manage terminal panes. It supports **tmux**, **Zellij**, and **iTerm2** (macOS).
 
 ### Option 1: tmux (Recommended)
 
@@ -97,24 +97,13 @@ tmux
 ```
 Then start `pi` inside that window.
 
-#### 3. Navigating Panes (Vanilla tmux)
-When your screen splits into multiple agents, you use "Prefix" commands to move around. By default, the prefix is **`Ctrl+b`**.
-
-- **Switch to next agent**: Press `Ctrl+b` then `o`.
-- **Switch using arrows**: Press `Ctrl+b` then any **Arrow Key**.
-- **How to Scroll**: Vanilla tmux does not use the mouse wheel by default.
-    1. Press `Ctrl+b` then `[` to enter "Copy Mode".
-    2. Use your **Arrow Keys** or **Page Up/Down** to scroll.
-    3. Press `q` to exit scroll mode and go back to typing.
-
-*Note: You can greatly improve this experience by enabling "mouse mode" in your `~/.tmux.conf` file.*
-
 ### Option 2: Zellij
 
 If you prefer **Zellij**, simply start `pi` inside a Zellij session. **pi-teams** will detect it via the `ZELLIJ` environment variable and use `zellij run` to spawn teammates in new panes.
 
-- **Switching Panes**: Use `Alt` + `Arrow Keys` (default) to move between agent panes.
-- **Closing Panes**: Use `Ctrl+t` then `p` then `x` (or your configured shortcut) to close a teammate pane if needed, though `force_kill_teammate` is recommended.
+### Option 3: iTerm2 (macOS)
+
+If you are using **iTerm2** on macOS and are *not* inside tmux or Zellij, **pi-teams** will use AppleScript to automatically split your current window into horizontal panes for each teammate. It will also name the panes with the teammate's agent name for easy identification.
 
 ---
 
