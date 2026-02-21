@@ -179,15 +179,43 @@ end tell`;
           paneId = `zellij_${safeName}`;
         } else if (process.env.TERM_PROGRAM === "iTerm.app" && !process.env.TMUX && !process.env.ZELLIJ) {
           const itermCmd = `cd ${params.cwd} && PI_TEAM_NAME=${safeTeamName} PI_AGENT_NAME=${safeName} ${piBinary}`;
-          const script = `tell application "iTerm2"
+          const teamConfig = await teams.readConfig(safeTeamName);
+          const teammates = teamConfig.members.filter(m => m.agentType === "teammate" && m.tmuxPaneId.startsWith("iterm_"));
+          const lastTeammate = teammates.length > 0 ? teammates[teammates.length - 1] : null;
+          
+          let script = "";
+          if (!lastTeammate) {
+            // First teammate: split current session vertically (side-by-side)
+            script = `tell application "iTerm2"
   tell current session of current window
-    set newSession to split horizontally with default profile
+    set newSession to split vertically with default profile
     tell newSession
       write text "${itermCmd.replace(/"/g, '\\"')}"
       return id
     end tell
   end tell
 end tell`;
+          } else {
+            // Subsequent teammate: split the last teammate's session horizontally (stacking them)
+            const lastSessionId = lastTeammate.tmuxPaneId.replace("iterm_", "");
+            script = `tell application "iTerm2"
+  repeat with aWindow in windows
+    repeat with aTab in tabs of aWindow
+      repeat with aSession in sessions of aTab
+        if id of aSession is "${lastSessionId}" then
+          tell aSession
+            set newSession to split horizontally with default profile
+            tell newSession
+              write text "${itermCmd.replace(/"/g, '\\"')}"
+              return id
+            end tell
+          end tell
+        end if
+      end repeat
+    end repeat
+  end repeat
+end tell`;
+          }
           const result = spawnSync("osascript", ["-e", script]);
           if (result.status !== 0) throw new Error(`osascript failed with status ${result.status}: ${result.stderr.toString()}`);
           paneId = `iterm_${result.stdout.toString().trim()}`;
@@ -203,7 +231,8 @@ end tell`;
           const result = spawnSync("tmux", tmuxArgs);
           if (result.status !== 0) throw new Error(`tmux failed with status ${result.status}: ${result.stderr.toString()}`);
           paneId = result.stdout.toString().trim();
-          spawnSync("tmux", ["select-layout", "even-horizontal"]);
+          spawnSync("tmux", ["set-window-option", "main-pane-width", "60%"]);
+          spawnSync("tmux", ["select-layout", "main-vertical"]);
         }
       } catch (e) {
         throw new Error(`Failed to spawn ${process.env.ZELLIJ && !process.env.TMUX ? "zellij" : (process.env.TERM_PROGRAM === "iTerm.app" ? "iTerm2" : "tmux")} pane: ${e}`);

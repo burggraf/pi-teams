@@ -110,7 +110,7 @@ If you prefer **Zellij**, simply start `pi` inside a Zellij session. **pi-teams*
 
 ### Option 3: iTerm2 (macOS)
 
-If you are using **iTerm2** on macOS and are *not* inside tmux or Zellij, **pi-teams** will use AppleScript to automatically split your current window into horizontal panes for each teammate. It will also name the panes with the teammate's agent name for easy identification.
+If you are using **iTerm2** on macOS and are *not* inside tmux or Zellij, **pi-teams** will use AppleScript to automatically split your current window into an optimized layout (1 large Lead pane on the left, Teammates stacked on the right). It will also name the panes with the teammate's agent name for easy identification.
 
 ---
 
