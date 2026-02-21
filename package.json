@@ -2,6 +2,7 @@
   "name": "pi-teams",
   "version": "0.1.0",
   "description": "Agent teams for pi, ported from claude-code-teams-mcp",
+  "repository": "github:burggraf/pi-teams",
   "keywords": ["pi-package"],
   "main": "extensions/index.ts",
   "dependencies": {
