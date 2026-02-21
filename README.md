@@ -111,7 +111,11 @@ When a teammate is spawned:
 - **tmux**: Must be installed on your system.
 - **pi**: The `pi` binary must be accessible in your environment.
 
-## Storage
-Data is stored in:
-- `~/.claude/teams/<team_name>/`: Configuration and inboxes.
-- `~/.claude/tasks/<team_name>/`: Task state files.
+## Credits and Attribution
+
+This project is a port of [claude-code-teams-mcp](https://github.com/cs50victor/claude-code-teams-mcp) by [cs50victor](https://github.com/cs50victor). It adapts the core team orchestration protocol and shared task management concepts from the original MCP server to work natively within the `pi` ecosystem.
+
+Special thanks to the original author for the architectural inspiration and for deep-diving into the agent coordination patterns that make this package possible.
+
+## License
+MIT
