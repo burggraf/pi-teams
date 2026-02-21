@@ -22,6 +22,7 @@
     "@sinclair/typebox": "*"
   },
   "pi": {
+    "image": "https://raw.githubusercontent.com/burggraf/pi-teams/main/pi-team-in-action.png",
     "extensions": ["extensions/index.ts"],
     "skills": ["skills"]
   }
