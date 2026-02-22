@@ -8,10 +8,6 @@
 | :---: | :---: | :---: |
 | <a href="iTerm2.png"><img src="iTerm2.png" width="300" alt="pi-teams in iTerm2"></a> | <a href="tmux.png"><img src="tmux.png" width="300" alt="pi-teams in tmux"></a> | <a href="zellij.png"><img src="zellij.png" width="300" alt="pi-teams in Zellij"></a> |
 
-## ✨ New in 0.6+0.7
-
-Require teammates to submit plans before touching code • Coordinate the entire team with a single broadcast • Run automated tests on task completion • Balance speed vs. depth with per-teammate thinking control
-
 ## 🛠 Installation
 
 Open your Pi terminal and type:
