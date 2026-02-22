@@ -1,3 +1,4 @@
+// Project: pi-teams
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
@@ -129,5 +130,13 @@ describe("Tasks Utilities", () => {
     await submitPlan("test-team", task.id, "My plan");
     await expect(evaluatePlan("test-team", task.id, "reject")).rejects.toThrow("Feedback is required when rejecting a plan");
     await expect(evaluatePlan("test-team", task.id, "reject", "   ")).rejects.toThrow("Feedback is required when rejecting a plan");
+  });
+
+  it("should sanitize task IDs in all file operations", async () => {
+    const dirtyId = "../evil-id";
+    // sanitizeName should throw on this dirtyId
+    await expect(readTask("test-team", dirtyId)).rejects.toThrow(/Invalid name: "..\/evil-id"/);
+    await expect(updateTask("test-team", dirtyId, { status: "in_progress" })).rejects.toThrow(/Invalid name: "..\/evil-id"/);
+    await expect(evaluatePlan("test-team", dirtyId, "approve")).rejects.toThrow(/Invalid name: "..\/evil-id"/);
   });
 });

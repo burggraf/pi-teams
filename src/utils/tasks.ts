@@ -1,3 +1,4 @@
+// Project: pi-teams
 import fs from "node:fs";
 import path from "node:path";
 import { TaskFile } from "./models";
@@ -11,6 +12,12 @@ export function getTaskId(teamName: string): string {
   const files = fs.readdirSync(dir).filter(f => f.endsWith(".json"));
   const ids = files.map(f => parseInt(path.parse(f).name, 10)).filter(id => !isNaN(id));
   return ids.length > 0 ? (Math.max(...ids) + 1).toString() : "1";
+}
+
+function getTaskPath(teamName: string, taskId: string): string {
+  const dir = taskDir(teamName);
+  const safeTaskId = sanitizeName(taskId);
+  return path.join(dir, `${safeTaskId}.json`);
 }
 
 export async function createTask(
@@ -49,9 +56,7 @@ export async function updateTask(
   updates: Partial<TaskFile>,
   retries?: number
 ): Promise<TaskFile> {
-  const dir = taskDir(teamName);
-  const safeTaskId = sanitizeName(taskId);
-  const p = path.join(dir, `${safeTaskId}.json`);
+  const p = getTaskPath(teamName, taskId);
 
   return await withLock(p, async () => {
     if (!fs.existsSync(p)) throw new Error(`Task ${taskId} not found`);
@@ -101,9 +106,7 @@ export async function evaluatePlan(
   feedback?: string,
   retries?: number
 ): Promise<TaskFile> {
-  const dir = taskDir(teamName);
-  const safeTaskId = sanitizeName(taskId);
-  const p = path.join(dir, `${safeTaskId}.json`);
+  const p = getTaskPath(teamName, taskId);
 
   return await withLock(p, async () => {
     if (!fs.existsSync(p)) throw new Error(`Task ${taskId} not found`);
@@ -139,9 +142,7 @@ export async function evaluatePlan(
 }
 
 export async function readTask(teamName: string, taskId: string, retries?: number): Promise<TaskFile> {
-  const dir = taskDir(teamName);
-  const safeTaskId = sanitizeName(taskId);
-  const p = path.join(dir, `${safeTaskId}.json`);
+  const p = getTaskPath(teamName, taskId);
   if (!fs.existsSync(p)) throw new Error(`Task ${taskId} not found`);
   return await withLock(p, async () => {
     return JSON.parse(fs.readFileSync(p, "utf-8"));

@@ -1,10 +1,12 @@
+// Project: pi-teams
 import fs from "node:fs";
 import path from "node:path";
 
+const LOCK_TIMEOUT = 5000; // 5 seconds of retrying
+const STALE_LOCK_TIMEOUT = 30000; // 30 seconds for a lock to be considered stale
+
 export async function withLock<T>(lockPath: string, fn: () => Promise<T>, retries: number = 50): Promise<T> {
   const lockFile = `${lockPath}.lock`;
-  const LOCK_TIMEOUT = 5000; // 5 seconds of retrying
-  const STALE_LOCK_TIMEOUT = 30000; // 30 seconds for a lock to be considered stale
   
   while (retries > 0) {
     try {
