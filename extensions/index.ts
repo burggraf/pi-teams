@@ -60,8 +60,27 @@ export default function (pi: ExtensionAPI) {
   pi.on("before_agent_start", async (event, ctx) => {
     if (isTeammate && firstTurn) {
       firstTurn = false;
+
+      // Get the teammate's model and thinking level from team config for accurate reporting
+      let modelInfo = "";
+      if (teamName) {
+        try {
+          const teamConfig = await teams.readConfig(teamName);
+          const member = teamConfig.members.find(m => m.name === agentName);
+          if (member && member.model) {
+            modelInfo = `\nYou are currently using model: ${member.model}`;
+            if (member.thinking) {
+              modelInfo += ` with thinking level: ${member.thinking}`;
+            }
+            modelInfo += `. When reporting your model or thinking level, use these exact values.`;
+          }
+        } catch (e) {
+          // If config can't be read, that's okay - proceed without model info
+        }
+      }
+
       return {
-        systemPrompt: event.systemPrompt + `\n\nYou are teammate '${agentName}' on team '${teamName}'.\nYour lead is 'team-lead'.\nStart by calling read_inbox(team_name="${teamName}") to get your initial instructions.`,
+        systemPrompt: event.systemPrompt + `\n\nYou are teammate '${agentName}' on team '${teamName}'.\nYour lead is 'team-lead'.${modelInfo}\nStart by calling read_inbox(team_name="${teamName}") to get your initial instructions.`,
       };
     }
   });
