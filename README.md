@@ -50,15 +50,21 @@ You don't need to learn complex code commands. Just talk to Pi in plain English!
 **New: Plan Approval Mode**
 > **You:** "Spawn a teammate named 'refactor-bot' and require plan approval before they make any changes."
 
-**New: Thinking Level Control**
-> **You:** "Spawn a teammate named 'architect-bot' with 'medium' thinking level for deep reasoning."
+**Customize Teammate Model & Thinking**
+> **You:** "Spawn a teammate named 'architect-bot' using 'gpt-4o' with 'high' thinking level for deep reasoning."
+> **You:** "Spawn a teammate named 'frontend-dev' using 'haiku' with 'low' thinking level for quick iterations."
+> **You:** "Spawn a teammate named 'code-reviewer' using 'gpt-4o' with 'medium' thinking level."
 
-You can set different thinking levels per teammate to balance speed vs. depth:
-- `off`: No thinking blocks (fastest)
-- `minimal`: Minimal reasoning overhead
-- `low`: Light reasoning for quick decisions
-- `medium`: Balanced reasoning (default for most work)
-- `high`: Extended reasoning for complex problems
+You can customize **both** the model and thinking level for each teammate independently:
+- **Model**: Override team's default model for a specific teammate (e.g., `gpt-4o`, `haiku`, `glm-4.7`)
+- **Thinking Level**: Balance speed vs. depth per teammate:
+  - `off`: No thinking blocks (fastest)
+  - `minimal`: Minimal reasoning overhead
+  - `low`: Light reasoning for quick decisions
+  - `medium`: Balanced reasoning (default for most work)
+  - `high`: Extended reasoning for complex problems
+
+This lets you build teams with varied capabilities—fast, lightweight teammates for simple tasks, and powerful, thoughtful teammates for complex work.
 
 ### 3. Assign a Task
 > **You:** "Create a task for security-bot: 'Check the .env.example file for sensitive defaults' and set it to in_progress."
@@ -100,9 +106,9 @@ Pi automatically uses these tools when you give instructions like the examples a
 
 ### Teammates
 - `spawn_teammate`: Launch a new agent into a `tmux` pane with a role and instructions. (Optional: `model`, `thinking`, `plan_mode_required`)
-  - `model`: Override the team's default model for this specific teammate
-  - `thinking`: Set the agent's thinking level (`off`, `minimal`, `low`, `medium`, `high`). This controls how much time the agent spends reasoning before responding. Default: inherited from team/global settings.
-  - `plan_mode_required`: If true, teammate must submit plans for lead approval before making code changes
+  - **`model`**: Specify which AI model this teammate should use (e.g., `gpt-4o`, `haiku`, `glm-4.7`, `glm-5`). If not specified, uses the team's default model. You can mix different models across teammates for cost/performance optimization.
+  - **`thinking`**: Set the agent's thinking level (`off`, `minimal`, `low`, `medium`, `high`). This controls how much time the agent spends reasoning before responding. If not specified, inherited from team/global settings. Different teammates can have different thinking levels.
+  - **`plan_mode_required`**: If true, teammate must submit plans for lead approval before making code changes
 - `check_teammate`: See if a teammate is still running or has unread messages.
 - `force_kill_teammate`: Stop a teammate and remove them from the team.
 - `process_shutdown_approved`: Orderly shutdown for a finished teammate.
