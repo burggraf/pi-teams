@@ -171,16 +171,39 @@ end tell`;
       await messaging.sendPlainMessage(safeTeamName, "team-lead", safeName, params.prompt, "Initial prompt");
 
       const piBinary = process.argv[1] ? `node ${process.argv[1]}` : "pi"; // Assumed on path
-      const piCmd = piBinary;
-      
+      let piCmd = piBinary;
+
+      // Build model command with thinking level if specified
+      if (chosenModel) {
+        // If model doesn't include provider prefix (provider/model), use the team's defaultModel or fallback
+        let modelWithProvider = chosenModel;
+        if (!chosenModel.includes('/')) {
+          // Check if team has a defaultModel with a provider prefix
+          if (teamConfig.defaultModel && teamConfig.defaultModel.includes('/')) {
+            const [provider] = teamConfig.defaultModel.split('/');
+            modelWithProvider = `${provider}/${chosenModel}`;
+          } else {
+            // Use zai as default provider for glm models (matching user's pi settings)
+            if (chosenModel.startsWith('glm-')) {
+              modelWithProvider = `zai/${chosenModel}`;
+            }
+          }
+        }
+
+        if (params.thinking) {
+          piCmd = `${piBinary} --model ${modelWithProvider}:${params.thinking}`;
+        } else {
+          piCmd = `${piBinary} --model ${modelWithProvider}`;
+        }
+      } else if (params.thinking) {
+        piCmd = `${piBinary} --thinking ${params.thinking}`;
+      }
+
       const env: Record<string, string> = {
         ...process.env,
         PI_TEAM_NAME: safeTeamName,
         PI_AGENT_NAME: safeName,
       };
-      if (params.thinking) {
-        env.PI_DEFAULT_THINKING_LEVEL = params.thinking;
-      }
 
       let paneId = "";
       try {
