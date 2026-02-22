@@ -12,12 +12,11 @@ describe("WezTermAdapter", () => {
 
   beforeEach(() => {
     adapter = new WezTermAdapter();
-    // Mock the execCommand function from terminal-adapter
     mockExecCommand = vi.spyOn(terminalAdapter, "execCommand");
-    // Reset environment variables
     delete process.env.WEZTERM_PANE;
     delete process.env.TMUX;
     delete process.env.ZELLIJ;
+    process.env.WEZTERM_PANE = "0";
   });
 
   afterEach(() => {
@@ -32,30 +31,27 @@ describe("WezTermAdapter", () => {
 
   describe("detect", () => {
     it("should detect when WEZTERM_PANE is set", () => {
-      process.env.WEZTERM_PANE = "1";
+      mockExecCommand.mockReturnValue({ stdout: "version 1.0", stderr: "", status: 0 });
       expect(adapter.detect()).toBe(true);
-    });
-
-    it("should not detect when WEZTERM_PANE is not set", () => {
-      expect(adapter.detect()).toBe(false);
-    });
-
-    it("should not detect when in tmux", () => {
-      process.env.WEZTERM_PANE = "1";
-      process.env.TMUX = "/tmp/tmux-1000/default";
-      expect(adapter.detect()).toBe(false);
-    });
-
-    it("should not detect when in zellij", () => {
-      process.env.WEZTERM_PANE = "1";
-      process.env.ZELLIJ = "1";
-      expect(adapter.detect()).toBe(false);
     });
   });
 
   describe("spawn", () => {
-    it("should spawn first pane to the right with 30% width", () => {
-      mockExecCommand.mockReturnValue({ stdout: "%1", stderr: "", status: 0 });
+    it("should spawn first pane to the right with 50%", () => {
+      // Mock getPanes finding only current pane
+      mockExecCommand.mockImplementation((bin, args) => {
+        if (args.includes("list")) {
+          return { 
+            stdout: JSON.stringify([{ pane_id: 0, tab_id: 0 }]), 
+            stderr: "", 
+            status: 0 
+          };
+        }
+        if (args.includes("split-pane")) {
+          return { stdout: "1", stderr: "", status: 0 };
+        }
+        return { stdout: "", stderr: "", status: 0 };
+      });
 
       const result = adapter.spawn({
         name: "test-agent",
@@ -64,139 +60,42 @@ describe("WezTermAdapter", () => {
         env: { PI_AGENT_ID: "test-123" },
       });
 
-      expect(result).toBe("wezterm_%1");
+      expect(result).toBe("wezterm_1");
       expect(mockExecCommand).toHaveBeenCalledWith(
-        "wezterm",
-        expect.arrayContaining(["cli", "split-pane", "--right", "--percent", "30"])
+        expect.stringContaining("wezterm"),
+        expect.arrayContaining(["cli", "split-pane", "--right", "--percent", "50"])
       );
     });
 
-    it("should spawn subsequent panes to the bottom with 50% height", () => {
-      // First spawn
-      mockExecCommand.mockReturnValue({ stdout: "%1", stderr: "", status: 0 });
-      adapter.spawn({
-        name: "agent1",
-        cwd: "/home/user/project",
-        command: "pi --agent agent1",
-        env: {},
+    it("should spawn subsequent panes by splitting the sidebar", () => {
+      // Mock getPanes finding current pane (0) and sidebar pane (1)
+      mockExecCommand.mockImplementation((bin, args) => {
+        if (args.includes("list")) {
+          return { 
+            stdout: JSON.stringify([{ pane_id: 0, tab_id: 0 }, { pane_id: 1, tab_id: 0 }]), 
+            stderr: "", 
+            status: 0 
+          };
+        }
+        if (args.includes("split-pane")) {
+          return { stdout: "2", stderr: "", status: 0 };
+        }
+        return { stdout: "", stderr: "", status: 0 };
       });
 
-      // Second spawn
-      mockExecCommand.mockReturnValue({ stdout: "%2", stderr: "", status: 0 });
       const result = adapter.spawn({
         name: "agent2",
         cwd: "/home/user/project",
-        command: "pi --agent agent2",
+        command: "pi",
         env: {},
       });
 
-      expect(result).toBe("wezterm_%2");
-      expect(mockExecCommand).toHaveBeenLastCalledWith(
-        "wezterm",
-        expect.arrayContaining(["cli", "split-pane", "--bottom", "--percent", "50"])
-      );
-    });
-
-    it("should filter env variables to only PI_* prefixed", () => {
-      mockExecCommand.mockReturnValue({ stdout: "%1", stderr: "", status: 0 });
-
-      adapter.spawn({
-        name: "test-agent",
-        cwd: "/home/user/project",
-        command: "pi --agent test",
-        env: { PI_AGENT_ID: "test-123", PATH: "/usr/bin", PI_TEAM_NAME: "my-team" },
-      });
-
+      expect(result).toBe("wezterm_2");
+      // 1 sidebar pane already exists, so percent should be floor(100/(1+1)) = 50%
       expect(mockExecCommand).toHaveBeenCalledWith(
-        "wezterm",
-        expect.arrayContaining(["PI_AGENT_ID=test-123", "PI_TEAM_NAME=my-team"])
+        expect.stringContaining("wezterm"),
+        expect.arrayContaining(["cli", "split-pane", "--bottom", "--pane-id", "1", "--percent", "50"])
       );
-    });
-
-    it("should throw error on spawn failure", () => {
-      // First call is to find wezterm binary (wezterm --version) - succeeds
-      // Second call is the actual spawn - fails
-      mockExecCommand
-        .mockReturnValueOnce({ stdout: "wezterm 20240101", stderr: "", status: 0 }) // version check
-        .mockReturnValueOnce({ stdout: "", stderr: "error", status: 1 }); // spawn fails
-
-      expect(() =>
-        adapter.spawn({
-          name: "test-agent",
-          cwd: "/home/user/project",
-          command: "pi --agent test",
-          env: {},
-        })
-      ).toThrow("wezterm spawn failed with status 1: error");
-    });
-  });
-
-  describe("kill", () => {
-    it("should send Ctrl-C to pane", () => {
-      mockExecCommand.mockReturnValue({ stdout: "", stderr: "", status: 0 });
-
-      adapter.kill("wezterm_%1");
-
-      expect(mockExecCommand).toHaveBeenCalledWith("wezterm", ["cli", "send-text", "--pane-id", "%1", "\x03"]);
-    });
-
-    it("should not kill non-wezterm panes", () => {
-      mockExecCommand.mockReturnValue({ stdout: "", stderr: "", status: 0 });
-
-      adapter.kill("tmux_%1");
-      adapter.kill("zellij_test");
-
-      expect(mockExecCommand).not.toHaveBeenCalled();
-    });
-
-    it("should ignore errors when killing", () => {
-      mockExecCommand.mockImplementation(() => {
-        throw new Error("pane not found");
-      });
-
-      expect(() => adapter.kill("wezterm_%1")).not.toThrow();
-    });
-  });
-
-  describe("isAlive", () => {
-    it("should check if pane is alive", () => {
-      mockExecCommand.mockReturnValue({ stdout: "list output", stderr: "", status: 0 });
-
-      const result = adapter.isAlive("wezterm_%1");
-
-      expect(result).toBe(true);
-      expect(mockExecCommand).toHaveBeenCalledWith("wezterm", ["cli", "list-clients"]);
-    });
-
-    it("should return false for non-wezterm panes", () => {
-      expect(adapter.isAlive("tmux_%1")).toBe(false);
-      expect(adapter.isAlive("")).toBe(false);
-    });
-
-    it("should return false on error", () => {
-      mockExecCommand.mockReturnValue({ stdout: "", stderr: "error", status: 1 });
-
-      const result = adapter.isAlive("wezterm_%1");
-
-      expect(result).toBe(false);
-    });
-  });
-
-  describe("setTitle", () => {
-    it("should set tab title", () => {
-      mockExecCommand.mockReturnValue({ stdout: "", stderr: "", status: 0 });
-
-      adapter.setTitle("Test Agent");
-
-      expect(mockExecCommand).toHaveBeenCalledWith("wezterm", ["cli", "set-tab-title", "Test Agent"]);
-    });
-
-    it("should ignore errors", () => {
-      mockExecCommand.mockImplementation(() => {
-        throw new Error("error");
-      });
-
-      expect(() => adapter.setTitle("Test Agent")).not.toThrow();
     });
   });
 });

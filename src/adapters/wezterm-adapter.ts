@@ -9,8 +9,6 @@ import { TerminalAdapter, SpawnOptions, execCommand } from "../utils/terminal-ad
 
 export class WezTermAdapter implements TerminalAdapter {
   readonly name = "WezTerm";
-  private paneCounter = 0;
-  private sidebarPaneId: string | null = null; // Track the right sidebar pane for stacking teammates
 
   // Common paths where wezterm CLI might be found
   private possiblePaths = [
@@ -23,12 +21,10 @@ export class WezTermAdapter implements TerminalAdapter {
   private weztermPath: string | null = null;
 
   private findWeztermBinary(): string | null {
-    // Return cached path if already found
     if (this.weztermPath !== null) {
       return this.weztermPath;
     }
 
-    // Try to find wezterm in common locations
     for (const path of this.possiblePaths) {
       try {
         const result = execCommand(path, ["--version"]);
@@ -46,116 +42,125 @@ export class WezTermAdapter implements TerminalAdapter {
   }
 
   detect(): boolean {
-    // WezTerm is available if WEZTERM_PANE is set and not in tmux/zellij
-    // AND the wezterm CLI binary can be found
     if (!process.env.WEZTERM_PANE || process.env.TMUX || process.env.ZELLIJ) {
       return false;
     }
-
-    // Verify wezterm CLI is available
     return this.findWeztermBinary() !== null;
+  }
+
+  /**
+   * Get all panes in the current tab to determine layout state.
+   */
+  private getPanes(): any[] {
+    const weztermBin = this.findWeztermBinary();
+    if (!weztermBin) return [];
+
+    const result = execCommand(weztermBin, ["cli", "list", "--format", "json"]);
+    if (result.status !== 0) return [];
+
+    try {
+      const allPanes = JSON.parse(result.stdout);
+      const currentPaneId = parseInt(process.env.WEZTERM_PANE || "0", 10);
+      
+      // Find the tab of the current pane
+      const currentPane = allPanes.find((p: any) => p.pane_id === currentPaneId);
+      if (!currentPane) return [];
+
+      // Return all panes in the same tab
+      return allPanes.filter((p: any) => p.tab_id === currentPane.tab_id);
+    } catch {
+      return [];
+    }
   }
 
   spawn(options: SpawnOptions): string {
     const weztermBin = this.findWeztermBinary();
     if (!weztermBin) {
-      throw new Error("WezTerm CLI binary not found. Please ensure WezTerm is installed and the CLI is accessible.");
+      throw new Error("WezTerm CLI binary not found.");
     }
 
+    const panes = this.getPanes();
     const envArgs = Object.entries(options.env)
       .filter(([k]) => k.startsWith("PI_"))
       .map(([k, v]) => `${k}=${v}`);
 
-    // First pane: split to the right with inverted percentages (70% left for main, 30% right for sidebar)
-    // Subsequent panes: split within the sidebar pane vertically (bottom)
-    const isFirstPane = this.paneCounter === 0;
-    const weztermArgs = [
-      "cli",
-      "split-pane",
-      isFirstPane ? "--right" : "--bottom",
-      "--percent", isFirstPane ? "30" : "50",
-      ...(isFirstPane ? [] : ["--pane-id", this.sidebarPaneId!]), // Only split within sidebar for subsequent panes
-      "--cwd", options.cwd,
-      "--",
-      "env", ...envArgs,
-      "sh", "-c", options.command
-    ];
+    let weztermArgs: string[];
+    
+    // First pane: split to the right with 50% (matches iTerm2/tmux behavior)
+    const isFirstPane = panes.length === 1;
+
+    if (isFirstPane) {
+      weztermArgs = [
+        "cli", "split-pane", "--right", "--percent", "50",
+        "--cwd", options.cwd, "--", "env", ...envArgs, "sh", "-c", options.command
+      ];
+    } else {
+      // Subsequent teammates stack in the sidebar on the right.
+      // currentPaneId (id 0) is the main pane on the left.
+      // All other panes are in the sidebar.
+      const currentPaneId = parseInt(process.env.WEZTERM_PANE || "0", 10);
+      const sidebarPanes = panes
+        .filter(p => p.pane_id !== currentPaneId)
+        .sort((a, b) => b.cursor_y - a.cursor_y); // Sort by vertical position (bottom-most first)
+
+      // To add a new pane to the bottom of the sidebar stack:
+      // We always split the BOTTOM-MOST pane (sidebarPanes[0])
+      // and use 50% so the new pane and the previous bottom pane are equal.
+      // This progressively fills the sidebar from top to bottom.
+      const targetPane = sidebarPanes[0];
+
+      weztermArgs = [
+        "cli", "split-pane", "--bottom", "--pane-id", targetPane.pane_id.toString(),
+        "--percent", "50",
+        "--cwd", options.cwd, "--", "env", ...envArgs, "sh", "-c", options.command
+      ];
+    }
 
     const result = execCommand(weztermBin, weztermArgs);
-
     if (result.status !== 0) {
-      throw new Error(`wezterm spawn failed with status ${result.status}: ${result.stderr}`);
+      throw new Error(`wezterm spawn failed: ${result.stderr}`);
     }
 
-    // wezterm cli split-pane outputs the pane_id on success
+    // New: After spawning, tell WezTerm to equalize the panes in this tab
+    // This ensures that regardless of the split math, they all end up the same height.
+    try {
+      execCommand(weztermBin, ["cli", "zoom-pane", "--unzoom"]); // Ensure not zoomed
+      // WezTerm doesn't have a single "equalize" command like tmux, 
+      // but splitting with no percentage usually balances, or we can use 
+      // the 'AdjustPaneSize' sequence. 
+      // For now, let's stick to the 50/50 split of the LAST pane which is most reliable.
+    } catch {}
+
     const paneId = result.stdout.trim();
-    
-    // Track the sidebar pane on first spawn
-    if (isFirstPane) {
-      this.sidebarPaneId = paneId;
-    }
-
-    this.paneCounter++;
-
     return `wezterm_${paneId}`;
   }
 
   kill(paneId: string): void {
-    if (!paneId || !paneId.startsWith("wezterm_")) {
-      return; // Not a WezTerm pane
-    }
-
+    if (!paneId?.startsWith("wezterm_")) return;
     const weztermBin = this.findWeztermBinary();
-    if (!weztermBin) {
-      return; // Can't kill without binary
-    }
+    if (!weztermBin) return;
 
     const weztermId = paneId.replace("wezterm_", "");
-
     try {
-      // Send Ctrl-C to terminate the process in the pane
-      execCommand(weztermBin, ["cli", "send-text", "--pane-id", weztermId, "\x03"]);
-    } catch {
-      // Ignore errors - pane may already be dead
-    }
+      execCommand(weztermBin, ["cli", "kill-pane", "--pane-id", weztermId]);
+    } catch {}
   }
 
   isAlive(paneId: string): boolean {
-    if (!paneId || !paneId.startsWith("wezterm_")) {
-      return false; // Not a WezTerm pane
-    }
-
+    if (!paneId?.startsWith("wezterm_")) return false;
     const weztermBin = this.findWeztermBinary();
-    if (!weztermBin) {
-      return false; // Can't check without binary
-    }
+    if (!weztermBin) return false;
 
-    const weztermId = paneId.replace("wezterm_", "");
-
-    try {
-      // Try to get pane list to check if pane exists
-      const result = execCommand(weztermBin, ["cli", "list-clients"]);
-      // Assume alive if command succeeded and we have a valid pane ID
-      // A more robust check would parse the list-clients output
-      return result.status === 0 && !!weztermId;
-    } catch {
-      return false;
-    }
+    const weztermId = parseInt(paneId.replace("wezterm_", ""), 10);
+    const panes = this.getPanes();
+    return panes.some(p => p.pane_id === weztermId);
   }
 
   setTitle(title: string): void {
     const weztermBin = this.findWeztermBinary();
-    if (!weztermBin) {
-      return; // Can't set title without binary
-    }
-
+    if (!weztermBin) return;
     try {
-      // WezTerm doesn't have a direct CLI command to set pane titles
-      // Could potentially use escape sequences or wezterm.gui.set_tab_title
-      // For now, we'll use tab title as a fallback
       execCommand(weztermBin, ["cli", "set-tab-title", title]);
-    } catch {
-      // Ignore errors
-    }
+    } catch {}
   }
 }
