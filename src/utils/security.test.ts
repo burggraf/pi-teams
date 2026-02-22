@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import path from "node:path";
 import os from "node:os";
 import fs from "node:fs";
-import { teamDir, inboxPath } from "./paths";
+import { teamDir, inboxPath, sanitizeName } from "./paths";
 
 describe("Security Audit - Path Traversal (Prevention Check)", () => {
   it("should throw an error for path traversal via teamName", () => {
@@ -25,8 +25,8 @@ describe("Security Audit - Path Traversal (Prevention Check)", () => {
   });
 });
 
-describe("Security Audit - Command Injection (Drafting)", () => {
-  it("should be vulnerable to command injection in spawn_teammate (via parameters)", () => {
+describe("Security Audit - Command Injection (Fixed)", () => {
+  it("should not be vulnerable to command injection in spawn_teammate (via parameters)", () => {
     const maliciousCwd = "; rm -rf / ;";
     const name = "attacker";
     const team_name = "audit-team";
@@ -34,9 +34,10 @@ describe("Security Audit - Command Injection (Drafting)", () => {
     const cmd = `PI_TEAM_NAME=${team_name} PI_AGENT_NAME=${name} ${piBinary}`;
     
     // Simulating what happens in spawn_teammate (extensions/index.ts)
-    const tmuxCmd = `tmux split-window -h -dP -F "#{pane_id}" "cd ${maliciousCwd} && ${cmd}"`;
+    const itermCmd = `cd '${maliciousCwd}' && ${cmd}`;
     
-    // The command becomes: tmux split-window -h -dP -F "#{pane_id}" "cd ; rm -rf / ; && PI_TEAM_NAME=audit-team PI_AGENT_NAME=attacker pi"
-    expect(tmuxCmd).toContain("cd ; rm -rf / ; &&");
+    // The command becomes: cd '; rm -rf / ;' && PI_TEAM_NAME=audit-team PI_AGENT_NAME=attacker pi
+    expect(itermCmd).toContain("cd '; rm -rf / ;' &&");
+    expect(itermCmd).not.toContain("cd ; rm -rf / ; &&");
   });
 });

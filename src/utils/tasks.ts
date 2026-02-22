@@ -45,7 +45,8 @@ export async function createTask(
 export async function updateTask(
   teamName: string,
   taskId: string,
-  updates: Partial<TaskFile>
+  updates: Partial<TaskFile>,
+  retries?: number
 ): Promise<TaskFile> {
   const dir = taskDir(teamName);
   const safeTaskId = sanitizeName(taskId);
@@ -63,17 +64,17 @@ export async function updateTask(
 
     fs.writeFileSync(p, JSON.stringify(updated, null, 2));
     return updated;
-  });
+  }, retries);
 }
 
-export async function readTask(teamName: string, taskId: string): Promise<TaskFile> {
+export async function readTask(teamName: string, taskId: string, retries?: number): Promise<TaskFile> {
   const dir = taskDir(teamName);
   const safeTaskId = sanitizeName(taskId);
   const p = path.join(dir, `${safeTaskId}.json`);
   if (!fs.existsSync(p)) throw new Error(`Task ${taskId} not found`);
   return await withLock(p, async () => {
     return JSON.parse(fs.readFileSync(p, "utf-8"));
-  });
+  }, retries);
 }
 
 export async function listTasks(teamName: string): Promise<TaskFile[]> {

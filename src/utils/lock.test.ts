@@ -33,18 +33,9 @@ describe("withLock", () => {
 
     const fn = vi.fn().mockResolvedValue("result");
     
-    // We expect it to fail after timeout (50 * 100ms = 5s)
-    vi.useFakeTimers();
-    
-    const promise = withLock(lockPath, fn);
-    
-    // Fast-forward 6000ms to be safe
-    await vi.advanceTimersByTimeAsync(6000);
-    
-    await expect(promise).rejects.toThrow("Could not acquire lock");
+    // Test with only 2 retries to speed up the failure
+    await expect(withLock(lockPath, fn, 2)).rejects.toThrow("Could not acquire lock");
     expect(fn).not.toHaveBeenCalled();
-    
-    vi.useRealTimers();
   });
 
   it("should release lock even if function fails", async () => {

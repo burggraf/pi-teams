@@ -184,7 +184,7 @@ end tell`;
           spawnSync("zellij", zellijArgs);
           paneId = `zellij_${safeName}`;
         } else if (process.env.TERM_PROGRAM === "iTerm.app" && !process.env.TMUX && !process.env.ZELLIJ) {
-          const itermCmd = `cd ${params.cwd} && PI_TEAM_NAME=${safeTeamName} PI_AGENT_NAME=${safeName} ${piCmd}`;
+          const itermCmd = `cd '${params.cwd}' && PI_TEAM_NAME=${safeTeamName} PI_AGENT_NAME=${safeName} ${piCmd}`;
           const teammates = teamConfig.members.filter(m => m.agentType === "teammate" && m.tmuxPaneId.startsWith("iterm_"));
           const lastTeammate = teammates.length > 0 ? teammates[teammates.length - 1] : null;
           

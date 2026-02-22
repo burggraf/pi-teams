@@ -66,18 +66,11 @@ describe("Tasks Utilities", () => {
     fs.writeFileSync(commonLockFile, "9999");
     
     // 2. Try updateTask, it should fail
-    vi.useFakeTimers();
-    const updatePromise = updateTask("test-team", taskId, { status: "in_progress" });
-    await vi.advanceTimersByTimeAsync(6000);
-    await expect(updatePromise).rejects.toThrow("Could not acquire lock");
-    vi.useRealTimers();
+    // Using small retries to speed up the test and avoid fake timer issues with native setTimeout
+    await expect(updateTask("test-team", taskId, { status: "in_progress" }, 2)).rejects.toThrow("Could not acquire lock");
 
     // 3. Try readTask, it should fail too
-    vi.useFakeTimers();
-    const readPromise = readTask("test-team", taskId);
-    await vi.advanceTimersByTimeAsync(6000);
-    await expect(readPromise).rejects.toThrow("Could not acquire lock");
-    vi.useRealTimers();
+    await expect(readTask("test-team", taskId, 2)).rejects.toThrow("Could not acquire lock");
     
     fs.unlinkSync(commonLockFile);
   });
