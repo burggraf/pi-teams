@@ -167,7 +167,7 @@ end tell`;
       await messaging.sendPlainMessage(safeTeamName, "team-lead", safeName, params.prompt, "Initial prompt");
 
       const piBinary = process.argv[1] ? `node ${process.argv[1]}` : "pi"; // Assumed on path
-      const piCmd = chosenModel ? `${piBinary} --model ${chosenModel}` : piBinary;
+      const piCmd = piBinary;
       
       let paneId = "";
       try {
