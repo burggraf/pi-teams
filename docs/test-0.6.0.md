@@ -39,7 +39,7 @@ Prompt:
 Test the shell-based hook system. First, create a hook script, then mark a task as completed.
 
 Prompt:
-"Create a shell script at '.pi/hooks/task_completed.sh' that echoes the task ID and status to a file called 'hook_results.txt'. Then, mark task #1 as 'completed' and verify that 'hook_results.txt' has been created."
+"Create a shell script at '.pi/team-hooks/task_completed.sh' that echoes the task ID and status to a file called 'hook_results.txt'. Then, mark task #1 as 'completed' and verify that 'hook_results.txt' has been created."
 
 ---
 

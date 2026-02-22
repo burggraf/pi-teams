@@ -7,7 +7,7 @@ const execFileAsync = promisify(execFile);
 
 /**
  * Runs a hook script asynchronously if it exists.
- * Hooks are located in .pi/hooks/{hookName}.sh relative to the CWD.
+ * Hooks are located in .pi/team-hooks/{hookName}.sh relative to the CWD.
  *
  * @param teamName The name of the team.
  * @param hookName The name of the hook to run (e.g., 'task_completed').
@@ -15,7 +15,7 @@ const execFileAsync = promisify(execFile);
  * @returns true if the hook doesn't exist or executes successfully; false otherwise.
  */
 export async function runHook(teamName: string, hookName: string, payload: any): Promise<boolean> {
-  const hookPath = path.join(process.cwd(), ".pi", "hooks", `${hookName}.sh`);
+  const hookPath = path.join(process.cwd(), ".pi", "team-hooks", `${hookName}.sh`);
 
   if (!fs.existsSync(hookPath)) {
     return true;

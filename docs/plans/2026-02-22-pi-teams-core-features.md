@@ -7,7 +7,7 @@
 **Architecture:**
 -   **Plan Approval**: Add a `planning` status to `TaskFile.status`. Create `task_submit_plan` and `task_evaluate_plan` tools. Lead can approve/reject.
 -   **Broadcast Messaging**: Add a `broadcast_message` tool that iterates through the team roster in `config.json` and sends messages to all active members.
--   **Quality Gate Hooks**: Introduce a simple hook system that triggers on `task_update` (specifically when status becomes `completed`). For now, it will look for a `.pi/hooks/task_completed.sh` or similar.
+-   **Quality Gate Hooks**: Introduce a simple hook system that triggers on `task_update` (specifically when status becomes `completed`). For now, it will look for a `.pi/team-hooks/task_completed.sh` or similar.
 
 **Tech Stack:** Node.js, TypeScript, Vitest
 
@@ -180,7 +180,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 export function runHook(teamName: string, hookName: string, payload: any): boolean {
-  const hookPath = path.join(process.cwd(), ".pi", "hooks", `${hookName}.sh`);
+  const hookPath = path.join(process.cwd(), ".pi", "team-hooks", `${hookName}.sh`);
   if (!fs.existsSync(hookPath)) return true; // No hook, success
 
   try {

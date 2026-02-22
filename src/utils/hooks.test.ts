@@ -4,7 +4,7 @@ import { runHook } from "./hooks";
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 
 describe("runHook", () => {
-  const hooksDir = path.join(process.cwd(), ".pi", "hooks");
+  const hooksDir = path.join(process.cwd(), ".pi", "team-hooks");
 
   beforeAll(() => {
     if (!fs.existsSync(hooksDir)) {

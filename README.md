@@ -61,7 +61,7 @@ Teammates in `planning` mode will use `task_submit_plan`. As the lead, you can t
 > **You:** "Broadcast to the entire team: 'The API endpoint has changed to /v2. Please update your work accordingly.'"
 
 ### 6. Automated Hooks
-Add a script at `.pi/hooks/task_completed.sh` to run automated checks when any task is finished.
+Add a script at `.pi/team-hooks/task_completed.sh` to run automated checks when any task is finished.
 ```bash
 #!/bin/bash
 # Example: Run tests when a task is completed
@@ -115,7 +115,7 @@ Pi automatically uses these tools when you give instructions like the examples a
 
 - **Initial Greeting**: When a teammate is spawned, they will automatically send a message saying they've started and are checking their inbox.
 - **Idle Polling**: Teammates check for new messages every 30 seconds if they are idle.
-- **Automated Hooks**: If `.pi/hooks/task_completed.sh` exists, it will automatically execute whenever a task status is changed to `completed`.
+- **Automated Hooks**: If `.pi/team-hooks/task_completed.sh` exists, it will automatically execute whenever a task status is changed to `completed`.
 - **Context Injection**: Each teammate is given a custom system prompt that defines their role and instructions for the team environment.
 
 ---
