@@ -2,7 +2,14 @@
 
 **pi-teams** turns your single Pi agent into a coordinated software engineering team. It allows you to spawn multiple "Teammate" agents in separate terminal panes that work autonomously, communicate with each other, and manage a shared task board—all mediated through **tmux**.
 
-<a href="pi-team-in-action.png"><img src="pi-team-in-action.png" width="600" alt="pi-teams in action"></a>
+<details>
+<summary><b>View pi-teams in action (click to expand)</b></summary>
+
+| iTerm2 | tmux | Zellij |
+| :---: | :---: | :---: |
+| <a href="iTerm2.png"><img src="iTerm2.png" width="300" alt="pi-teams in iTerm2"></a> | <a href="tmux.png"><img src="tmux.png" width="300" alt="pi-teams in tmux"></a> | <a href="zellij.png"><img src="zellij.png" width="300" alt="pi-teams in Zellij"></a> |
+
+</details>
 
 ## 🛠 Installation
 
