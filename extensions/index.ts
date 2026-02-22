@@ -147,7 +147,23 @@ export default function (pi: ExtensionAPI) {
       }
 
       const teamConfig = await teams.readConfig(safeTeamName);
-      const chosenModel = params.model || teamConfig.defaultModel;
+      let chosenModel = params.model || teamConfig.defaultModel;
+
+      // If model doesn't include provider prefix (provider/model), use the team's defaultModel or fallback
+      if (chosenModel && !chosenModel.includes('/')) {
+        // Check if team has a defaultModel with a provider prefix
+        if (teamConfig.defaultModel && teamConfig.defaultModel.includes('/')) {
+          const [provider] = teamConfig.defaultModel.split('/');
+          chosenModel = `${provider}/${chosenModel}`;
+        } else {
+          // Infer provider from model name
+          if (chosenModel.startsWith('glm-')) {
+            chosenModel = `zai/${chosenModel}`;
+          } else if (chosenModel.startsWith('claude-')) {
+            chosenModel = `anthropic/${chosenModel}`;
+          }
+        }
+      }
 
       const member: Member = {
         agentId: `${safeName}@${safeTeamName}`,
@@ -172,25 +188,13 @@ export default function (pi: ExtensionAPI) {
 
       // Build model command with thinking level if specified
       if (chosenModel) {
-        // If model doesn't include provider prefix (provider/model), use the team's defaultModel or fallback
-        let modelWithProvider = chosenModel;
-        if (!chosenModel.includes('/')) {
-          // Check if team has a defaultModel with a provider prefix
-          if (teamConfig.defaultModel && teamConfig.defaultModel.includes('/')) {
-            const [provider] = teamConfig.defaultModel.split('/');
-            modelWithProvider = `${provider}/${chosenModel}`;
-          } else {
-            // Use zai as default provider for glm models (matching user's pi settings)
-            if (chosenModel.startsWith('glm-')) {
-              modelWithProvider = `zai/${chosenModel}`;
-            }
-          }
-        }
+        const [provider, ...modelParts] = chosenModel.split('/');
+        const modelName = modelParts.join('/');
 
         if (params.thinking) {
-          piCmd = `${piBinary} --model ${modelWithProvider}:${params.thinking}`;
+          piCmd = `${piBinary} --provider ${provider} --model ${modelName}:${params.thinking}`;
         } else {
-          piCmd = `${piBinary} --model ${modelWithProvider}`;
+          piCmd = `${piBinary} --provider ${provider} --model ${modelName}`;
         }
       } else if (params.thinking) {
         piCmd = `${piBinary} --thinking ${params.thinking}`;
