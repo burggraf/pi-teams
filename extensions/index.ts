@@ -119,7 +119,7 @@ end tell`;
       description: Type.Optional(Type.String()),
       default_model: Type.Optional(Type.String()),
     }),
-    async execute(toolCallId, params, signal, onUpdate, ctx) {
+    async execute(toolCallId, params: any, signal, onUpdate, ctx) {
       const config = teams.createTeam(params.team_name, "local-session", "lead-agent", params.description, params.default_model);
       return {
         content: [{ type: "text", text: `Team ${params.team_name} created.` }],
@@ -138,8 +138,9 @@ end tell`;
       prompt: Type.String(),
       cwd: Type.String(),
       model: Type.Optional(Type.String()),
+      plan_mode_required: Type.Optional(Type.Boolean({ default: false })),
     }),
-    async execute(toolCallId, params, signal, onUpdate, ctx) {
+    async execute(toolCallId, params: any, signal, onUpdate, ctx) {
       const safeName = paths.sanitizeName(params.name);
       const safeTeamName = paths.sanitizeName(params.team_name);
 
@@ -161,6 +162,7 @@ end tell`;
         subscriptions: [],
         prompt: params.prompt,
         color: "blue",
+        planModeRequired: params.plan_mode_required,
       };
 
       await teams.addMember(safeTeamName, member);
@@ -264,10 +266,30 @@ end tell`;
       content: Type.String(),
       summary: Type.String(),
     }),
-    async execute(toolCallId, params, signal, onUpdate, ctx) {
+    async execute(toolCallId, params: any, signal, onUpdate, ctx) {
       await messaging.sendPlainMessage(params.team_name, agentName, params.recipient, params.content, params.summary);
       return {
         content: [{ type: "text", text: `Message sent to ${params.recipient}.` }],
+        details: {},
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "broadcast_message",
+    label: "Broadcast Message",
+    description: "Broadcast a message to all team members except the sender.",
+    parameters: Type.Object({
+      team_name: Type.String(),
+      content: Type.String(),
+      summary: Type.String(),
+      color: Type.Optional(Type.String()),
+    }),
+    async execute(toolCallId, params: any, signal, onUpdate, ctx) {
+      await messaging.broadcastMessage(params.team_name, agentName, params.content, params.summary, params.color);
+      return {
+        content: [{ type: "text", text: `Message broadcasted to all team members.` }],
+        details: {},
       };
     },
   });
@@ -310,6 +332,43 @@ end tell`;
   });
 
   pi.registerTool({
+    name: "task_submit_plan",
+    label: "Submit Plan",
+    description: "Submit a plan for a task, updating its status to 'planning'.",
+    parameters: Type.Object({
+      team_name: Type.String(),
+      task_id: Type.String(),
+      plan: Type.String(),
+    }),
+    async execute(toolCallId, params: any, signal, onUpdate, ctx) {
+      const updated = await tasks.submitPlan(params.team_name, params.task_id, params.plan);
+      return {
+        content: [{ type: "text", text: `Plan submitted for task ${params.task_id}.` }],
+        details: { task: updated },
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "task_evaluate_plan",
+    label: "Evaluate Plan",
+    description: "Evaluate a submitted plan for a task.",
+    parameters: Type.Object({
+      team_name: Type.String(),
+      task_id: Type.String(),
+      action: StringEnum(["approve", "reject"]),
+      feedback: Type.Optional(Type.String({ description: "Required for rejection" })),
+    }),
+    async execute(toolCallId, params: any, signal, onUpdate, ctx) {
+      const updated = await tasks.evaluatePlan(params.team_name, params.task_id, params.action as any, params.feedback);
+      return {
+        content: [{ type: "text", text: `Plan for task ${params.task_id} has been ${params.action}d.` }],
+        details: { task: updated },
+      };
+    },
+  });
+
+  pi.registerTool({
     name: "task_list",
     label: "List Tasks",
     description: "List all team tasks.",
@@ -332,10 +391,10 @@ end tell`;
     parameters: Type.Object({
       team_name: Type.String(),
       task_id: Type.String(),
-      status: Type.Optional(StringEnum(["pending", "in_progress", "completed", "deleted"])),
+      status: Type.Optional(StringEnum(["pending", "planning", "in_progress", "completed", "deleted"])),
       owner: Type.Optional(Type.String()),
     }),
-    async execute(toolCallId, params, signal, onUpdate, ctx) {
+    async execute(toolCallId, params: any, signal, onUpdate, ctx) {
       const updated = await tasks.updateTask(params.team_name, params.task_id, {
         status: params.status as any,
         owner: params.owner,

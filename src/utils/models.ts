@@ -29,7 +29,9 @@ export interface TaskFile {
   subject: string;
   description: string;
   activeForm?: string;
-  status: "pending" | "in_progress" | "completed" | "deleted";
+  status: "pending" | "planning" | "in_progress" | "completed" | "deleted";
+  plan?: string;
+  planFeedback?: string;
   blocks: string[];
   blockedBy: string[];
   owner?: string;

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { createTask, updateTask, readTask, listTasks } from "./tasks";
+import { createTask, updateTask, readTask, listTasks, submitPlan, evaluatePlan } from "./tasks";
 import * as paths from "./paths";
 import * as teams from "./teams";
 
@@ -43,6 +43,24 @@ describe("Tasks Utilities", () => {
     expect(taskData.status).toBe("in_progress");
   });
 
+  it("should submit a plan successfully", async () => {
+    const task = await createTask("test-team", "Test Subject", "Test Description");
+    const plan = "Step 1: Do something\nStep 2: Profit";
+    const updated = await submitPlan("test-team", task.id, plan);
+    expect(updated.status).toBe("planning");
+    expect(updated.plan).toBe(plan);
+    
+    const taskData = JSON.parse(fs.readFileSync(path.join(testDir, `${task.id}.json`), "utf-8"));
+    expect(taskData.status).toBe("planning");
+    expect(taskData.plan).toBe(plan);
+  });
+
+  it("should fail to submit an empty plan", async () => {
+    const task = await createTask("test-team", "Empty Test", "Should fail");
+    await expect(submitPlan("test-team", task.id, "")).rejects.toThrow("Plan must not be empty");
+    await expect(submitPlan("test-team", task.id, "   ")).rejects.toThrow("Plan must not be empty");
+  });
+
   it("should list tasks", async () => {
     await createTask("test-team", "Task 1", "Desc 1");
     await createTask("test-team", "Task 2", "Desc 2");
@@ -73,5 +91,43 @@ describe("Tasks Utilities", () => {
     await expect(readTask("test-team", taskId, 2)).rejects.toThrow("Could not acquire lock");
     
     fs.unlinkSync(commonLockFile);
+  });
+
+  it("should approve a plan successfully", async () => {
+    const task = await createTask("test-team", "Plan Test", "Should be approved");
+    await submitPlan("test-team", task.id, "Wait for it...");
+    
+    const approved = await evaluatePlan("test-team", task.id, "approve");
+    expect(approved.status).toBe("in_progress");
+    expect(approved.planFeedback).toBe("");
+  });
+
+  it("should reject a plan with feedback", async () => {
+    const task = await createTask("test-team", "Plan Test", "Should be rejected");
+    await submitPlan("test-team", task.id, "Wait for it...");
+    
+    const feedback = "Not good enough!";
+    const rejected = await evaluatePlan("test-team", task.id, "reject", feedback);
+    expect(rejected.status).toBe("planning");
+    expect(rejected.planFeedback).toBe(feedback);
+  });
+
+  it("should fail to evaluate a task not in 'planning' status", async () => {
+    const task = await createTask("test-team", "Status Test", "Invalid status for eval");
+    // status is "pending"
+    await expect(evaluatePlan("test-team", task.id, "approve")).rejects.toThrow("must be in 'planning' status");
+  });
+
+  it("should fail to evaluate a task without a plan", async () => {
+    const task = await createTask("test-team", "Plan Missing Test", "No plan submitted");
+    await updateTask("test-team", task.id, { status: "planning" }); // bypass submitPlan to have no plan
+    await expect(evaluatePlan("test-team", task.id, "approve")).rejects.toThrow("no plan has been submitted");
+  });
+
+  it("should fail to reject a plan without feedback", async () => {
+    const task = await createTask("test-team", "Feedback Test", "Should require feedback");
+    await submitPlan("test-team", task.id, "My plan");
+    await expect(evaluatePlan("test-team", task.id, "reject")).rejects.toThrow("Feedback is required when rejecting a plan");
+    await expect(evaluatePlan("test-team", task.id, "reject", "   ")).rejects.toThrow("Feedback is required when rejecting a plan");
   });
 });

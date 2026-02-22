@@ -23,6 +23,9 @@ pi install npm:pi-teams
 - **Spawn Specialists**: Create agents like "Security Expert" or "Frontend Pro" to handle sub-tasks in parallel.
 - **Shared Task Board**: Keep everyone on the same page with a persistent list of tasks and their status.
 - **Agent Messaging**: Agents can send direct messages to each other and to you (the Team Lead) to report progress.
+- **Broadcast Messaging**: Send a message to the entire team at once for global coordination.
+- **Plan Approval Mode**: Require teammates to submit their implementation plans for lead approval before they touch any code.
+- **Quality Gate Hooks**: Automated shell scripts can run when tasks are completed (e.g., to run tests or linting).
 - **Autonomous Work**: Teammates automatically "wake up," read their instructions, and poll their inboxes for new work while idle.
 - **Beautiful UI**: Optimized vertical splits in `tmux` with clear labels so you always know who is doing what.
 
@@ -44,14 +47,28 @@ You don't need to learn complex code commands. Just talk to Pi in plain English!
 **Pro Tip:** You can specify a different model for a specific teammate!
 > **You:** "Spawn a teammate named 'speed-bot' using 'haiku' to quickly run some benchmarks."
 
+**New: Plan Approval Mode**
+> **You:** "Spawn a teammate named 'refactor-bot' and require plan approval before they make any changes."
+
 ### 3. Assign a Task
 > **You:** "Create a task for security-bot: 'Check the .env.example file for sensitive defaults' and set it to in_progress."
 
-### 4. Send a Message
-> **You:** "Tell security-bot to focus on the 'config/' directory first."
-> *The lead agent uses `send_message` to put an instruction in the teammate's inbox.*
+### 4. Submit and Evaluate a Plan
+Teammates in `planning` mode will use `task_submit_plan`. As the lead, you can then:
+> **You:** "Review refactor-bot's plan for task 5. If it looks good, approve it. If not, reject it with feedback on the test coverage."
 
-### 5. Inter-Agent Communication
+### 5. Broadcast a Message
+> **You:** "Broadcast to the entire team: 'The API endpoint has changed to /v2. Please update your work accordingly.'"
+
+### 6. Automated Hooks
+Add a script at `.pi/hooks/task_completed.sh` to run automated checks when any task is finished.
+```bash
+#!/bin/bash
+# Example: Run tests when a task is completed
+npm test
+```
+
+### 7. Inter-Agent Communication
 > Teammates can also talk to each other! For example, a `frontend-bot` can message a `backend-bot` to coordinate on an API schema without your intervention.
 
 ### 6. Check on Progress
@@ -81,11 +98,16 @@ Pi automatically uses these tools when you give instructions like the examples a
 - `task_create`: Create a new task.
 - `task_list`: List all tasks and their current status.
 - `task_get`: Get full details of a specific task.
-- `task_update`: Update a task's status or owner.
+- `task_update`: Update a task's status (pending, planning, in_progress, etc.) or owner.
 
 ### Messaging
 - `send_message`: Send a message to a teammate or lead.
+- `broadcast_message`: Send a message to the entire team.
 - `read_inbox`: Read incoming messages for an agent.
+
+### Task Planning & Approval
+- `task_submit_plan`: For teammates to submit their implementation plans.
+- `task_evaluate_plan`: For the lead to approve or reject a plan (with feedback).
 
 ---
 
@@ -93,6 +115,7 @@ Pi automatically uses these tools when you give instructions like the examples a
 
 - **Initial Greeting**: When a teammate is spawned, they will automatically send a message saying they've started and are checking their inbox.
 - **Idle Polling**: Teammates check for new messages every 30 seconds if they are idle.
+- **Automated Hooks**: If `.pi/hooks/task_completed.sh` exists, it will automatically execute whenever a task status is changed to `completed`.
 - **Context Injection**: Each teammate is given a custom system prompt that defines their role and instructions for the team environment.
 
 ---

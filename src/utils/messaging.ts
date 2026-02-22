@@ -3,6 +3,7 @@ import path from "node:path";
 import { InboxMessage } from "./models";
 import { withLock } from "./lock";
 import { inboxPath } from "./paths";
+import { readConfig } from "./teams";
 
 export function nowIso(): string {
   return new Date().toISOString();
@@ -70,4 +71,38 @@ export async function sendPlainMessage(
     color,
   };
   await appendMessage(teamName, toName, msg);
+}
+
+/**
+ * Broadcasts a message to all team members except the sender.
+ * @param teamName The name of the team
+ * @param fromName The name of the sender
+ * @param text The message text
+ * @param summary A short summary of the message
+ * @param color An optional color for the message
+ */
+export async function broadcastMessage(
+  teamName: string,
+  fromName: string,
+  text: string,
+  summary: string,
+  color?: string
+) {
+  const config = await readConfig(teamName);
+
+  // Create an array of delivery promises for all members except the sender
+  const deliveryPromises = config.members
+    .filter((member) => member.name !== fromName)
+    .map((member) => sendPlainMessage(teamName, fromName, member.name, text, summary, color));
+
+  // Execute deliveries in parallel and wait for all to settle
+  const results = await Promise.allSettled(deliveryPromises);
+
+  // Log failures for diagnostics
+  const failures = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+  if (failures.length > 0) {
+    console.error(`Broadcast partially failed: ${failures.length} messages could not be delivered.`);
+    // Optionally log individual errors
+    failures.forEach((f) => console.error(`- Delivery error:`, f.reason));
+  }
 }

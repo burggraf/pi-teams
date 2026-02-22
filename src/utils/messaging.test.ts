@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { appendMessage, readInbox, sendPlainMessage } from "./messaging";
+import { appendMessage, readInbox, sendPlainMessage, broadcastMessage } from "./messaging";
 import * as paths from "./paths";
 
 // Mock the paths to use a temporary directory
@@ -18,6 +18,9 @@ describe("Messaging Utilities", () => {
       return path.join(testDir, "inboxes", `${agentName}.json`);
     });
     vi.spyOn(paths, "teamDir").mockReturnValue(testDir);
+    vi.spyOn(paths, "configPath").mockImplementation((teamName) => {
+      return path.join(testDir, "config.json");
+    });
   });
 
   afterEach(() => {
@@ -65,5 +68,37 @@ describe("Messaging Utilities", () => {
     const all = await readInbox("test-team", "receiver", false, false);
     expect(all.length).toBe(2);
     expect(all.every(m => m.read)).toBe(true);
+  });
+
+  it("should broadcast message to all members except the sender", async () => {
+    // Setup team config
+    const config = {
+      name: "test-team",
+      members: [
+        { name: "sender" },
+        { name: "member1" },
+        { name: "member2" }
+      ]
+    };
+    const configFilePath = path.join(testDir, "config.json");
+    fs.writeFileSync(configFilePath, JSON.stringify(config));
+    
+    await broadcastMessage("test-team", "sender", "broadcast text", "summary");
+
+    // Check member1's inbox
+    const inbox1 = await readInbox("test-team", "member1", false, false);
+    expect(inbox1.length).toBe(1);
+    expect(inbox1[0].text).toBe("broadcast text");
+    expect(inbox1[0].from).toBe("sender");
+
+    // Check member2's inbox
+    const inbox2 = await readInbox("test-team", "member2", false, false);
+    expect(inbox2.length).toBe(1);
+    expect(inbox2[0].text).toBe("broadcast text");
+    expect(inbox2[0].from).toBe("sender");
+
+    // Check sender's inbox (should be empty)
+    const inboxSender = await readInbox("test-team", "sender", false, false);
+    expect(inboxSender.length).toBe(0);
   });
 });
