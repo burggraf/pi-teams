@@ -6,7 +6,8 @@ import * as teams from "../src/utils/teams";
 import * as tasks from "../src/utils/tasks";
 import * as messaging from "../src/utils/messaging";
 import { Member } from "../src/utils/models";
-import { execSync, spawnSync } from "node:child_process";
+import { getTerminalAdapter } from "../src/adapters/terminal-registry";
+import { Iterm2Adapter } from "../src/adapters/iterm2-adapter";
 import path from "node:path";
 import fs from "node:fs";
 
@@ -14,6 +15,9 @@ export default function (pi: ExtensionAPI) {
   const isTeammate = !!process.env.PI_AGENT_NAME;
   const agentName = process.env.PI_AGENT_NAME || "team-lead";
   const teamName = process.env.PI_TEAM_NAME;
+
+  // Get the terminal adapter once at startup
+  const terminal = getTerminalAdapter();
 
   pi.on("session_start", async (_event, ctx) => {
     paths.ensureDirs();
@@ -26,15 +30,9 @@ export default function (pi: ExtensionAPI) {
       // Use a shorter, more prominent status at the beginning if possible
       ctx.ui.setStatus("00-pi-teams", `[${agentName.toUpperCase()}]`); 
       
-      // Also set the tmux pane title for better visibility
-      try {
-        if (process.env.TMUX) {
-          spawnSync("tmux", ["select-pane", "-T", agentName]);
-        } else if (process.env.TERM_PROGRAM === "iTerm.app") {
-          spawnSync("osascript", ["-e", `tell application "iTerm2" to tell current session of current window to set name to "${agentName}"`]);
-        }
-      } catch (e) {
-        // ignore
+      // Set the terminal pane title for better visibility
+      if (terminal) {
+        terminal.setTitle(agentName);
       }
       
       // Auto-trigger the first turn for teammates
@@ -99,32 +97,8 @@ export default function (pi: ExtensionAPI) {
       }
     }
 
-    if (member.tmuxPaneId) {
-      try {
-        if (member.tmuxPaneId.startsWith("iterm_")) {
-          const itermId = member.tmuxPaneId.replace("iterm_", "");
-          const script = `tell application "iTerm2"
-  repeat with aWindow in windows
-    repeat with aTab in tabs of aWindow
-      repeat with aSession in sessions of aTab
-        if id of aSession is "${itermId}" then
-          close aSession
-          return "Closed"
-        end if
-      end repeat
-    end repeat
-  end repeat
-end tell`;
-          spawnSync("osascript", ["-e", script]);
-        } else if (member.tmuxPaneId.startsWith("zellij_")) {
-          // Zellij is expected to close on process exit (using --close-on-exit)
-        } else {
-          // Use -t with the pane_id
-          spawnSync("tmux", ["kill-pane", "-t", member.tmuxPaneId.trim()]);
-        }
-      } catch (e) {
-        // ignore
-      }
+    if (member.tmuxPaneId && terminal) {
+      terminal.kill(member.tmuxPaneId);
     }
   }
 
@@ -150,7 +124,7 @@ end tell`;
   pi.registerTool({
     name: "spawn_teammate",
     label: "Spawn Teammate",
-    description: "Spawn a new teammate in a tmux pane.",
+    description: "Spawn a new teammate in a terminal pane.",
     parameters: Type.Object({
       team_name: Type.String(),
       name: Type.String(),
@@ -166,6 +140,10 @@ end tell`;
 
       if (!teams.teamExists(safeTeamName)) {
         throw new Error(`Team ${params.team_name} does not exist`);
+      }
+
+      if (!terminal) {
+        throw new Error("No terminal adapter detected. Ensure you're running in tmux, iTerm2, or Zellij.");
       }
 
       const teamConfig = await teams.readConfig(safeTeamName);
@@ -224,87 +202,28 @@ end tell`;
         PI_AGENT_NAME: safeName,
       };
 
-      let paneId = "";
-      try {
-        if (process.env.ZELLIJ && !process.env.TMUX) {
-          const zellijArgs = [
-            "run", 
-            "--name", safeName, 
-            "--cwd", params.cwd, 
-            "--close-on-exit",
-            "--", 
-            "env", ...Object.entries(env).filter(([k]) => k.startsWith("PI_")).map(([k, v]) => `${k}=${v}`),
-            "sh", "-c", piCmd
-          ];
-          spawnSync("zellij", zellijArgs);
-          paneId = `zellij_${safeName}`;
-        } else if (process.env.TERM_PROGRAM === "iTerm.app" && !process.env.TMUX && !process.env.ZELLIJ) {
-          const envStr = Object.entries(env)
-            .filter(([k]) => k.startsWith("PI_"))
-            .map(([k, v]) => `${k}=${v}`)
-            .join(" ");
-          const itermCmd = `cd '${params.cwd}' && ${envStr} ${piCmd}`;
-          const teammates = teamConfig.members.filter(m => m.agentType === "teammate" && m.tmuxPaneId.startsWith("iterm_"));
-          const lastTeammate = teammates.length > 0 ? teammates[teammates.length - 1] : null;
-          
-          let script = "";
-          if (!lastTeammate) {
-            // First teammate: split current session vertically (side-by-side)
-            script = `tell application "iTerm2"
-  tell current session of current window
-    set newSession to split vertically with default profile
-    tell newSession
-      write text "${itermCmd.replace(/"/g, '\\"')}"
-      return id
-    end tell
-  end tell
-end tell`;
-          } else {
-            // Subsequent teammate: split the last teammate's session horizontally (stacking them)
-            const lastSessionId = lastTeammate.tmuxPaneId.replace("iterm_", "");
-            script = `tell application "iTerm2"
-  repeat with aWindow in windows
-    repeat with aTab in tabs of aWindow
-      repeat with aSession in sessions of aTab
-        if id of aSession is "${lastSessionId}" then
-          tell aSession
-            set newSession to split horizontally with default profile
-            tell newSession
-              write text "${itermCmd.replace(/"/g, '\\"')}"
-              return id
-            end tell
-          end tell
-        end if
-      end repeat
-    end repeat
-  end repeat
-end tell`;
-          }
-          const result = spawnSync("osascript", ["-e", script]);
-          if (result.status !== 0) throw new Error(`osascript failed with status ${result.status}: ${result.stderr.toString()}`);
-          paneId = `iterm_${result.stdout.toString().trim()}`;
+      // For iTerm2, we need to handle the spawn context for proper layout
+      if (terminal instanceof Iterm2Adapter) {
+        const teammates = teamConfig.members.filter(m => m.agentType === "teammate" && m.tmuxPaneId.startsWith("iterm_"));
+        const lastTeammate = teammates.length > 0 ? teammates[teammates.length - 1] : null;
+        if (lastTeammate?.tmuxPaneId) {
+          terminal.setSpawnContext({ lastSessionId: lastTeammate.tmuxPaneId.replace("iterm_", "") });
         } else {
-          const envArgs = Object.entries(env)
-            .filter(([k]) => k.startsWith("PI_"))
-            .map(([k, v]) => `${k}=${v}`);
-          const tmuxArgs = [
-            "split-window", 
-            "-h", "-dP", 
-            "-F", "#{pane_id}", 
-            "-c", params.cwd, 
-            "env", ...envArgs,
-            "sh", "-c", piCmd
-          ];
-          const result = spawnSync("tmux", tmuxArgs);
-          if (result.status !== 0) throw new Error(`tmux failed with status ${result.status}: ${result.stderr.toString()}`);
-          paneId = result.stdout.toString().trim();
-          spawnSync("tmux", ["set-window-option", "main-pane-width", "60%"]);
-          spawnSync("tmux", ["select-layout", "main-vertical"]);
+          terminal.setSpawnContext({});
         }
-      } catch (e) {
-        throw new Error(`Failed to spawn ${process.env.ZELLIJ && !process.env.TMUX ? "zellij" : (process.env.TERM_PROGRAM === "iTerm.app" ? "iTerm2" : "tmux")} pane: ${e}`);
       }
 
+      let paneId = "";
+      try {
+        paneId = terminal.spawn({
+          name: safeName,
+          cwd: params.cwd,
+          command: piCmd,
+          env: env,
+        });
+      } catch (e) {
+        throw new Error(`Failed to spawn ${terminal.name} pane: ${e}`);
+      }
 
       // Update member with paneId
       await teams.updateMember(params.team_name, params.name, { tmuxPaneId: paneId });
@@ -533,7 +452,7 @@ end tell`;
   pi.registerTool({
     name: "force_kill_teammate",
     label: "Force Kill Teammate",
-    description: "Forcibly kill a teammate's tmux target.",
+    description: "Forcibly kill a teammate's terminal pane.",
     parameters: Type.Object({
       team_name: Type.String(),
       agent_name: Type.String(),
@@ -567,33 +486,8 @@ end tell`;
       if (!member) throw new Error(`Teammate ${params.agent_name} not found`);
 
       let alive = false;
-      if (member.tmuxPaneId) {
-        try {
-          if (member.tmuxPaneId.startsWith("zellij_")) {
-            // Assume alive if it's zellij for now
-            alive = true;
-          } else if (member.tmuxPaneId.startsWith("iterm_")) {
-            const itermId = member.tmuxPaneId.replace("iterm_", "");
-            const script = `tell application "iTerm2"
-  repeat with aWindow in windows
-    repeat with aTab in tabs of aWindow
-      repeat with aSession in sessions of aTab
-        if id of aSession is "${itermId}" then
-          return "Alive"
-        end if
-      end repeat
-    end repeat
-  end repeat
-end tell`;
-            const result = spawnSync("osascript", ["-e", script]);
-            alive = result.stdout.toString().includes("Alive");
-          } else {
-            execSync(`tmux has-session -t ${member.tmuxPaneId}`);
-            alive = true;
-          }
-        } catch (e) {
-          alive = false;
-        }
+      if (member.tmuxPaneId && terminal) {
+        alive = terminal.isAlive(member.tmuxPaneId);
       }
 
       const unreadCount = (await messaging.readInbox(params.team_name, params.agent_name, true, false)).length;
