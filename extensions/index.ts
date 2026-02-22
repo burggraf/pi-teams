@@ -138,6 +138,7 @@ end tell`;
       prompt: Type.String(),
       cwd: Type.String(),
       model: Type.Optional(Type.String()),
+      thinking: Type.Optional(StringEnum(["off", "minimal", "low", "medium", "high"])),
       plan_mode_required: Type.Optional(Type.Boolean({ default: false })),
     }),
     async execute(toolCallId, params: any, signal, onUpdate, ctx) {
@@ -162,6 +163,7 @@ end tell`;
         subscriptions: [],
         prompt: params.prompt,
         color: "blue",
+        thinking: params.thinking,
         planModeRequired: params.plan_mode_required,
       };
 
@@ -171,6 +173,15 @@ end tell`;
       const piBinary = process.argv[1] ? `node ${process.argv[1]}` : "pi"; // Assumed on path
       const piCmd = piBinary;
       
+      const env: Record<string, string> = {
+        ...process.env,
+        PI_TEAM_NAME: safeTeamName,
+        PI_AGENT_NAME: safeName,
+      };
+      if (params.thinking) {
+        env.PI_DEFAULT_THINKING_LEVEL = params.thinking;
+      }
+
       let paneId = "";
       try {
         if (process.env.ZELLIJ && !process.env.TMUX) {
@@ -180,13 +191,17 @@ end tell`;
             "--cwd", params.cwd, 
             "--close-on-exit",
             "--", 
-            "env", `PI_TEAM_NAME=${safeTeamName}`, `PI_AGENT_NAME=${safeName}`,
+            "env", ...Object.entries(env).filter(([k]) => k.startsWith("PI_")).map(([k, v]) => `${k}=${v}`),
             "sh", "-c", piCmd
           ];
           spawnSync("zellij", zellijArgs);
           paneId = `zellij_${safeName}`;
         } else if (process.env.TERM_PROGRAM === "iTerm.app" && !process.env.TMUX && !process.env.ZELLIJ) {
-          const itermCmd = `cd '${params.cwd}' && PI_TEAM_NAME=${safeTeamName} PI_AGENT_NAME=${safeName} ${piCmd}`;
+          const envStr = Object.entries(env)
+            .filter(([k]) => k.startsWith("PI_"))
+            .map(([k, v]) => `${k}=${v}`)
+            .join(" ");
+          const itermCmd = `cd '${params.cwd}' && ${envStr} ${piCmd}`;
           const teammates = teamConfig.members.filter(m => m.agentType === "teammate" && m.tmuxPaneId.startsWith("iterm_"));
           const lastTeammate = teammates.length > 0 ? teammates[teammates.length - 1] : null;
           
@@ -227,12 +242,15 @@ end tell`;
           if (result.status !== 0) throw new Error(`osascript failed with status ${result.status}: ${result.stderr.toString()}`);
           paneId = `iterm_${result.stdout.toString().trim()}`;
         } else {
+          const envArgs = Object.entries(env)
+            .filter(([k]) => k.startsWith("PI_"))
+            .map(([k, v]) => `${k}=${v}`);
           const tmuxArgs = [
             "split-window", 
             "-h", "-dP", 
             "-F", "#{pane_id}", 
             "-c", params.cwd, 
-            "env", `PI_TEAM_NAME=${safeTeamName}`, `PI_AGENT_NAME=${safeName}`,
+            "env", ...envArgs,
             "sh", "-c", piCmd
           ];
           const result = spawnSync("tmux", tmuxArgs);

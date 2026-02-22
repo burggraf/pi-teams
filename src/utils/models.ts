@@ -9,6 +9,7 @@ export interface Member {
   subscriptions: any[];
   prompt?: string;
   color?: string;
+  thinking?: "off" | "minimal" | "low" | "medium" | "high";
   planModeRequired?: boolean;
   backendType?: string;
   isActive?: boolean;
