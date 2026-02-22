@@ -31,8 +31,14 @@ You don't need to learn complex code commands. Just talk to Pi in plain English!
 ### 1. Start a Team
 > **You:** "Create a team named 'my-app-audit' for reviewing the codebase."
 
+**Pro Tip:** You can also set a default model for the whole team!
+> **You:** "Create a team named 'Research' and use 'gpt-4o' for everyone."
+
 ### 2. Spawn a Teammate
 > **You:** "Spawn a teammate named 'security-bot' in the current folder. Tell them to scan for hardcoded API keys."
+
+**Pro Tip:** You can specify a different model for a specific teammate!
+> **You:** "Spawn a teammate named 'speed-bot' using 'haiku' to quickly run some benchmarks."
 
 ### 3. Assign a Task
 > **You:** "Create a task for security-bot: 'Check the .env.example file for sensitive defaults' and set it to in_progress."
@@ -57,12 +63,12 @@ You don't need to learn complex code commands. Just talk to Pi in plain English!
 Pi automatically uses these tools when you give instructions like the examples above.
 
 ### Team Management
-- `team_create`: Start a new team.
+- `team_create`: Start a new team. (Optional: `default_model`)
 - `team_delete`: Delete a team and its data.
 - `read_config`: Get details about the team and its members.
 
 ### Teammates
-- `spawn_teammate`: Launch a new agent into a `tmux` pane with a role and instructions.
+- `spawn_teammate`: Launch a new agent into a `tmux` pane with a role and instructions. (Optional: `model`)
 - `check_teammate`: See if a teammate is still running or has unread messages.
 - `force_kill_teammate`: Stop a teammate and remove them from the team.
 - `process_shutdown_approved`: Orderly shutdown for a finished teammate.
@@ -84,6 +90,15 @@ Pi automatically uses these tools when you give instructions like the examples a
 - **Initial Greeting**: When a teammate is spawned, they will automatically send a message saying they've started and are checking their inbox.
 - **Idle Polling**: Teammates check for new messages every 30 seconds if they are idle.
 - **Context Injection**: Each teammate is given a custom system prompt that defines their role and instructions for the team environment.
+
+---
+
+## 📂 Configuration & Data
+
+All team and task data is stored in your home directory:
+`~/.pi/teams/` and `~/.pi/tasks/`
+
+You can manually inspect these JSON files if you ever need to debug your team's configuration or message history.
 
 ---
 

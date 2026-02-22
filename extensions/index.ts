@@ -117,9 +117,10 @@ end tell`;
     parameters: Type.Object({
       team_name: Type.String(),
       description: Type.Optional(Type.String()),
+      default_model: Type.Optional(Type.String()),
     }),
     async execute(toolCallId, params, signal, onUpdate, ctx) {
-      const config = teams.createTeam(params.team_name, "local-session", "lead-agent", params.description);
+      const config = teams.createTeam(params.team_name, "local-session", "lead-agent", params.description, params.default_model);
       return {
         content: [{ type: "text", text: `Team ${params.team_name} created.` }],
         details: { config },
@@ -136,6 +137,7 @@ end tell`;
       name: Type.String(),
       prompt: Type.String(),
       cwd: Type.String(),
+      model: Type.Optional(Type.String()),
     }),
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const safeName = paths.sanitizeName(params.name);
@@ -145,11 +147,14 @@ end tell`;
         throw new Error(`Team ${params.team_name} does not exist`);
       }
 
+      const teamConfig = await teams.readConfig(safeTeamName);
+      const chosenModel = params.model || teamConfig.defaultModel;
+
       const member: Member = {
         agentId: `${safeName}@${safeTeamName}`,
         name: safeName,
         agentType: "teammate",
-        model: "sonnet",
+        model: chosenModel,
         joinedAt: Date.now(),
         tmuxPaneId: "",
         cwd: params.cwd,
@@ -162,6 +167,7 @@ end tell`;
       await messaging.sendPlainMessage(safeTeamName, "team-lead", safeName, params.prompt, "Initial prompt");
 
       const piBinary = process.argv[1] ? `node ${process.argv[1]}` : "pi"; // Assumed on path
+      const piCmd = chosenModel ? `${piBinary} --model ${chosenModel}` : piBinary;
       
       let paneId = "";
       try {
@@ -173,13 +179,12 @@ end tell`;
             "--close-on-exit",
             "--", 
             "env", `PI_TEAM_NAME=${safeTeamName}`, `PI_AGENT_NAME=${safeName}`,
-            "sh", "-c", piBinary
+            "sh", "-c", piCmd
           ];
           spawnSync("zellij", zellijArgs);
           paneId = `zellij_${safeName}`;
         } else if (process.env.TERM_PROGRAM === "iTerm.app" && !process.env.TMUX && !process.env.ZELLIJ) {
-          const itermCmd = `cd ${params.cwd} && PI_TEAM_NAME=${safeTeamName} PI_AGENT_NAME=${safeName} ${piBinary}`;
-          const teamConfig = await teams.readConfig(safeTeamName);
+          const itermCmd = `cd ${params.cwd} && PI_TEAM_NAME=${safeTeamName} PI_AGENT_NAME=${safeName} ${piCmd}`;
           const teammates = teamConfig.members.filter(m => m.agentType === "teammate" && m.tmuxPaneId.startsWith("iterm_"));
           const lastTeammate = teammates.length > 0 ? teammates[teammates.length - 1] : null;
           
@@ -226,7 +231,7 @@ end tell`;
             "-F", "#{pane_id}", 
             "-c", params.cwd, 
             "env", `PI_TEAM_NAME=${safeTeamName}`, `PI_AGENT_NAME=${safeName}`,
-            "sh", "-c", piBinary
+            "sh", "-c", piCmd
           ];
           const result = spawnSync("tmux", tmuxArgs);
           if (result.status !== 0) throw new Error(`tmux failed with status ${result.status}: ${result.stderr.toString()}`);

@@ -2,12 +2,12 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 
-export const CLAUDE_DIR = path.join(os.homedir(), ".claude");
-export const TEAMS_DIR = path.join(CLAUDE_DIR, "teams");
-export const TASKS_DIR = path.join(CLAUDE_DIR, "tasks");
+export const PI_DIR = path.join(os.homedir(), ".pi");
+export const TEAMS_DIR = path.join(PI_DIR, "teams");
+export const TASKS_DIR = path.join(PI_DIR, "tasks");
 
 export function ensureDirs() {
-  if (!fs.existsSync(CLAUDE_DIR)) fs.mkdirSync(CLAUDE_DIR);
+  if (!fs.existsSync(PI_DIR)) fs.mkdirSync(PI_DIR);
   if (!fs.existsSync(TEAMS_DIR)) fs.mkdirSync(TEAMS_DIR);
   if (!fs.existsSync(TASKS_DIR)) fs.mkdirSync(TASKS_DIR);
 }

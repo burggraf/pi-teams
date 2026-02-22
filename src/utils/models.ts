@@ -2,7 +2,7 @@ export interface Member {
   agentId: string;
   name: string;
   agentType: string;
-  model: string;
+  model?: string;
   joinedAt: number;
   tmuxPaneId: string;
   cwd: string;
@@ -21,6 +21,7 @@ export interface TeamConfig {
   leadAgentId: string;
   leadSessionId: string;
   members: Member[];
+  defaultModel?: string;
 }
 
 export interface TaskFile {

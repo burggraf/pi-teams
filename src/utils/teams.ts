@@ -12,7 +12,8 @@ export function createTeam(
   name: string,
   sessionId: string,
   leadAgentId: string,
-  description = ""
+  description = "",
+  defaultModel?: string
 ): TeamConfig {
   const dir = teamDir(name);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -24,7 +25,6 @@ export function createTeam(
     agentId: leadAgentId,
     name: "team-lead",
     agentType: "lead",
-    model: "unknown",
     joinedAt: Date.now(),
     tmuxPaneId: process.env.TMUX_PANE || "",
     cwd: process.cwd(),
@@ -38,6 +38,7 @@ export function createTeam(
     leadAgentId,
     leadSessionId: sessionId,
     members: [leadMember],
+    defaultModel,
   };
 
   fs.writeFileSync(configPath(name), JSON.stringify(config, null, 2));
