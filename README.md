@@ -1,6 +1,6 @@
 # pi-teams 🚀
 
-**pi-teams** turns your single Pi agent into a coordinated software engineering team. It allows you to spawn multiple "Teammate" agents in separate terminal panes that work autonomously, communicate with each other, and manage a shared task board—all mediated through tmux, Zellij, iTerm2, WezTerm, or Kitty.
+**pi-teams** turns your single Pi agent into a coordinated software engineering team. It allows you to spawn multiple "Teammate" agents in separate terminal panes that work autonomously, communicate with each other, and manage a shared task board—all mediated through tmux, Zellij, iTerm2, or WezTerm.
 
 ### 🖥️ pi-teams in Action
 
@@ -8,7 +8,7 @@
 | :---: | :---: | :---: |
 | <a href="iTerm2.png"><img src="iTerm2.png" width="300" alt="pi-teams in iTerm2"></a> | <a href="tmux.png"><img src="tmux.png" width="300" alt="pi-teams in tmux"></a> | <a href="zellij.png"><img src="zellij.png" width="300" alt="pi-teams in Zellij"></a> |
 
-*Also works with **WezTerm** and **Kitty** (cross-platform support)*
+*Also works with **WezTerm** (cross-platform support)*
 
 ## 🛠 Installation
 
@@ -91,7 +91,7 @@ Teammates in `planning` mode will use `task_submit_plan`. As the lead, review th
 
 ## 🪟 Terminal Requirements
 
-To show multiple agents on one screen, **pi-teams** requires a way to manage terminal panes. It supports **tmux**, **Zellij**, **iTerm2**, **WezTerm**, and **Kitty**.
+To show multiple agents on one screen, **pi-teams** requires a way to manage terminal panes. It supports **tmux**, **Zellij**, **iTerm2**, and **WezTerm**.
 
 ### Option 1: tmux (Recommended)
 
@@ -126,20 +126,6 @@ How to run:
 ```bash
 wezterm  # Start WezTerm
 pi       # Start pi inside WezTerm
-```
-
-### Option 5: Kitty (macOS, Linux)
-
-**Kitty** is a fast, feature-rich, GPU-based terminal emulator with excellent performance. If you are using Kitty and are *not* inside tmux or Zellij, **pi-teams** will use `kitty @ launch` to spawn teammates in new panes with an optimized layout (1 large Lead pane on the left, Teammates stacked on the right).
-
-Install Kitty:
-- **macOS**: `brew install --cask kitty`
-- **Linux**: See [kovidgoyal.net/kitty](https://sw.kovidgoyal.net/kitty/binary/)
-
-How to run:
-```bash
-kitty  # Start Kitty
-pi     # Start pi inside Kitty
 ```
 
 ## 📜 Credits & Attribution

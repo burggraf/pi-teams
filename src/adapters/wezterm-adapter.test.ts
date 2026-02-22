@@ -54,7 +54,7 @@ describe("WezTermAdapter", () => {
   });
 
   describe("spawn", () => {
-    it("should spawn first pane to the left with 30% width", () => {
+    it("should spawn first pane to the right with 30% width", () => {
       mockExecCommand.mockReturnValue({ stdout: "%1", stderr: "", status: 0 });
 
       const result = adapter.spawn({
@@ -67,7 +67,7 @@ describe("WezTermAdapter", () => {
       expect(result).toBe("wezterm_%1");
       expect(mockExecCommand).toHaveBeenCalledWith(
         "wezterm",
-        expect.arrayContaining(["cli", "split-pane", "--left", "--percent", "30"])
+        expect.arrayContaining(["cli", "split-pane", "--right", "--percent", "30"])
       );
     });
 
@@ -114,7 +114,11 @@ describe("WezTermAdapter", () => {
     });
 
     it("should throw error on spawn failure", () => {
-      mockExecCommand.mockReturnValue({ stdout: "", stderr: "error", status: 1 });
+      // First call is to find wezterm binary (wezterm --version) - succeeds
+      // Second call is the actual spawn - fails
+      mockExecCommand
+        .mockReturnValueOnce({ stdout: "wezterm 20240101", stderr: "", status: 0 }) // version check
+        .mockReturnValueOnce({ stdout: "", stderr: "error", status: 1 }); // spawn fails
 
       expect(() =>
         adapter.spawn({
