@@ -9,14 +9,25 @@ import { TerminalAdapter } from "../utils/terminal-adapter";
 import { TmuxAdapter } from "./tmux-adapter";
 import { Iterm2Adapter } from "./iterm2-adapter";
 import { ZellijAdapter } from "./zellij-adapter";
+import { WezTermAdapter } from "./wezterm-adapter";
+import { KittyAdapter } from "./kitty-adapter";
 
 /**
  * Available terminal adapters, ordered by priority
+ *
+ * Detection order (first match wins):
+ * 1. tmux - if TMUX env is set
+ * 2. Zellij - if ZELLIJ env is set and not in tmux
+ * 3. iTerm2 - if TERM_PROGRAM=iTerm.app and not in tmux/zellij
+ * 4. WezTerm - if WEZTERM_PANE env is set and not in tmux/zellij
+ * 5. Kitty - if KITTY_WINDOW_ID env is set and not in tmux/zellij
  */
 const adapters: TerminalAdapter[] = [
   new TmuxAdapter(),
-  new Iterm2Adapter(),
   new ZellijAdapter(),
+  new Iterm2Adapter(),
+  new WezTermAdapter(),
+  new KittyAdapter(),
 ];
 
 /**
@@ -26,12 +37,14 @@ let cachedAdapter: TerminalAdapter | null = null;
 
 /**
  * Detect and return the appropriate terminal adapter for the current environment.
- * 
+ *
  * Detection order (first match wins):
  * 1. tmux - if TMUX env is set
- * 2. iTerm2 - if TERM_PROGRAM=iTerm.app and not in tmux/zellij
- * 3. Zellij - if ZELLIJ env is set and not in tmux
- * 
+ * 2. Zellij - if ZELLIJ env is set and not in tmux
+ * 3. iTerm2 - if TERM_PROGRAM=iTerm.app and not in tmux/zellij
+ * 4. WezTerm - if WEZTERM_PANE env is set and not in tmux/zellij
+ * 5. Kitty - if KITTY_WINDOW_ID env is set and not in tmux/zellij
+ *
  * @returns The detected terminal adapter, or null if none detected
  */
 export function getTerminalAdapter(): TerminalAdapter | null {
@@ -51,8 +64,8 @@ export function getTerminalAdapter(): TerminalAdapter | null {
 
 /**
  * Get a specific terminal adapter by name.
- * 
- * @param name - The adapter name (e.g., "tmux", "iTerm2", "zellij")
+ *
+ * @param name - The adapter name (e.g., "tmux", "iTerm2", "zellij", "WezTerm", "Kitty")
  * @returns The adapter instance, or undefined if not found
  */
 export function getAdapterByName(name: string): TerminalAdapter | undefined {

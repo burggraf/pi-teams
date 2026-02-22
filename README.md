@@ -1,12 +1,14 @@
 # pi-teams 🚀
 
-**pi-teams** turns your single Pi agent into a coordinated software engineering team. It allows you to spawn multiple "Teammate" agents in separate terminal panes that work autonomously, communicate with each other, and manage a shared task board—all mediated through tmux, iTerm2, or Zellij.
+**pi-teams** turns your single Pi agent into a coordinated software engineering team. It allows you to spawn multiple "Teammate" agents in separate terminal panes that work autonomously, communicate with each other, and manage a shared task board—all mediated through tmux, Zellij, iTerm2, WezTerm, or Kitty.
 
 ### 🖥️ pi-teams in Action
 
 | iTerm2 | tmux | Zellij |
 | :---: | :---: | :---: |
 | <a href="iTerm2.png"><img src="iTerm2.png" width="300" alt="pi-teams in iTerm2"></a> | <a href="tmux.png"><img src="tmux.png" width="300" alt="pi-teams in tmux"></a> | <a href="zellij.png"><img src="zellij.png" width="300" alt="pi-teams in Zellij"></a> |
+
+*Also works with **WezTerm** and **Kitty** (cross-platform support)*
 
 ## 🛠 Installation
 
@@ -87,9 +89,9 @@ Teammates in `planning` mode will use `task_submit_plan`. As the lead, review th
 - **[Full Usage Guide](docs/guide.md)** - Detailed examples, hook system, best practices, and troubleshooting
 - **[Tool Reference](docs/reference.md)** - Complete documentation of all tools and parameters
 
-## 🪟 Terminal Requirements: tmux, Zellij, or iTerm2
+## 🪟 Terminal Requirements
 
-To show multiple agents on one screen, **pi-teams** requires a way to manage terminal panes. It supports **tmux**, **Zellij**, and **iTerm2** (macOS).
+To show multiple agents on one screen, **pi-teams** requires a way to manage terminal panes. It supports **tmux**, **Zellij**, **iTerm2**, **WezTerm**, and **Kitty**.
 
 ### Option 1: tmux (Recommended)
 
@@ -110,6 +112,35 @@ Simply start `pi` inside a Zellij session. **pi-teams** will detect it via the `
 ### Option 3: iTerm2 (macOS)
 
 If you are using **iTerm2** on macOS and are *not* inside tmux or Zellij, **pi-teams** will use AppleScript to automatically split your current window into an optimized layout (1 large Lead pane on the left, Teammates stacked on the right). It will also name the panes with the teammate's agent name for easy identification.
+
+### Option 4: WezTerm (macOS, Linux, Windows)
+
+**WezTerm** is a GPU-accelerated, cross-platform terminal emulator written in Rust. If you are using WezTerm and are *not* inside tmux or Zellij, **pi-teams** will use `wezterm cli split-pane` to spawn teammates in new panes with an optimized layout (1 large Lead pane on the left, Teammates stacked on the right).
+
+Install WezTerm:
+- **macOS**: `brew install --cask wezterm`
+- **Linux**: See [wezterm.org/installation](https://wezterm.org/installation)
+- **Windows**: Download from [wezterm.org](https://wezterm.org)
+
+How to run:
+```bash
+wezterm  # Start WezTerm
+pi       # Start pi inside WezTerm
+```
+
+### Option 5: Kitty (macOS, Linux)
+
+**Kitty** is a fast, feature-rich, GPU-based terminal emulator with excellent performance. If you are using Kitty and are *not* inside tmux or Zellij, **pi-teams** will use `kitty @ launch` to spawn teammates in new panes with an optimized layout (1 large Lead pane on the left, Teammates stacked on the right).
+
+Install Kitty:
+- **macOS**: `brew install --cask kitty`
+- **Linux**: See [kovidgoyal.net/kitty](https://sw.kovidgoyal.net/kitty/binary/)
+
+How to run:
+```bash
+kitty  # Start Kitty
+pi     # Start pi inside Kitty
+```
 
 ## 📜 Credits & Attribution
 
