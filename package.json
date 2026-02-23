@@ -2,7 +2,10 @@
   "name": "pi-teams",
   "version": "0.8.2",
   "description": "Agent teams for pi, ported from claude-code-teams-mcp",
-  "repository": "github:burggraf/pi-teams",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/burggraf/pi-teams.git"
+  },
   "author": "Mark Burggraf",
   "license": "MIT",
   "keywords": [
