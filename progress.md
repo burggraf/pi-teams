@@ -1,51 +1,36 @@
-# Progress: Testing Audit and Edge Case Test Creation
-<!-- 
-  WHAT: This is your session log. It records what you've done and the results.
-  WHY: You'll forget what you've tried. This file builds a searchable history.
-  WHEN: Update throughout your session. After each significant action, log it.
--->
+# Progress Log: Separate Windows Mode Implementation
 
-## Session Start: Saturday, February 21, 2026 at 10:40:27 AM PST
+## 2026-02-26
 
-### Goal
-Perform a testing audit of core utilities (messaging, task management, lock mechanisms) and extensions, identify testing gaps, and propose/implement new test cases for edge cases.
+### Completed
+- [x] Researched terminal window title support for iTerm2, WezTerm, tmux, Zellij
+- [x] Clarified requirements with user:
+  - True separate OS windows (not panes/tabs)
+  - Team lead also gets separate window
+  - Title format: `team-name: agent-name`
+  - iTerm2: use window title property via escape sequences
+  - Implementation: optional flag + global setting
+  - Skip tmux and Zellij for now
+- [x] Created comprehensive task_plan.md with 10 phases
+- [x] Created findings.md with technical research details
 
-### Phases Completed
-- [x] Phase 1: Requirements & Discovery (Complete)
-- [x] Phase 3: Implementation (Infrastructure) (Complete)
-- [x] Phase 4: Implementation (Test Cases) (In progress)
+### Next Steps
+1. ✅ Phase 1: Update Terminal Adapter Interface - COMPLETE
+2. ✅ Phase 2: iTerm2 Window Support - COMPLETE
+3. ✅ Phase 3: WezTerm Window Support - COMPLETE
+4. ✅ Phase 4: Terminal Registry - COMPLETE
+5. ✅ Phase 5: Team Configuration - COMPLETE
+6. ✅ Phase 6: spawn_teammate Tool - COMPLETE
+7. ✅ Phase 7: spawn_lead_window Tool - COMPLETE
+8. ✅ Phase 8: Lifecycle Management (killTeammate, check_teammate updated) - COMPLETE
+9. ✅ Phase 9: Testing - COMPLETE (all 8 tests pass, TypeScript compiles)
+10. Phase 10: Documentation
 
-### Action Log
-| Action | Phase | Result |
-|--------|-------|--------|
-| `read_inbox` | Discovery | Received initial instructions from `team-lead` |
-| `ls -R` | Discovery | Analyzed project structure |
-| `read` core files | Discovery | Analyzed `lock.ts`, `messaging.ts`, `tasks.ts`, `extensions/index.ts`, `models.ts` |
-| Create planning files | Discovery | Initialized `task_plan.md`, `findings.md`, `progress.md` |
-| Set up Vitest | Infrastructure | Installed `vitest`, `typescript`, `@types/node`, `ts-node` |
-| Create `tsconfig.json` | Infrastructure | Created `tsconfig.json` for Vitest support |
-| Implement `lock.test.ts` | Test Cases | 3 tests passed (1 unhandled rejection noted) |
-| Implement `tasks.test.ts` | Test Cases | 4 tests passed (Confirmed BUG 2 - lock inconsistency) |
-| Implement `messaging.test.ts` | Test Cases | 3 tests passed (Stress test successful) |
-
-### Test Results
-| Test Case | Result | Notes |
-|-----------|--------|-------|
-| `lock.test.ts` | PASS | Confirmed basic lock/release and timeout behavior |
-| `tasks.test.ts` | PASS | Confirmed lock inconsistency between update/read |
-| `messaging.test.ts` | PASS | Confirmed stress test with 100 concurrent appends works |
-
-### Errors Encountered
-| Error | Attempt | Resolution |
-|-------|---------|------------|
-| `task_list` returned ENOENT | 1 | Realized no tasks were created yet |
+### Blockers
+None
 
 ### Decisions Made
-| Decision | Rationale |
-|----------|-----------|
-| Use Vitest for testing | Simple setup, good TypeScript support, fast execution |
-
-### Notes
-- Project has no tests.
-- Core utilities are well-structured but have some edge cases in locking and concurrency.
-- Plan to propose Vitest setup and implement tests for `lock.ts` first.
+- Use escape sequences (`\033]2;Title\007`) for iTerm2 window titles since AppleScript window.title is read-only
+- Add new `windowId` field to Member model instead of reusing `tmuxPaneId`
+- Store `separateWindows` global setting in TeamConfig
+- Skip tmux/Zellij entirely (no fallback attempted)

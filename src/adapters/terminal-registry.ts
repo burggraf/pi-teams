@@ -99,3 +99,22 @@ export function setAdapter(adapter: TerminalAdapter): void {
 export function hasTerminalAdapter(): boolean {
   return getTerminalAdapter() !== null;
 }
+
+/**
+ * Check if the current terminal supports spawning separate OS windows.
+ * 
+ * @returns true if the detected terminal supports windows (iTerm2, WezTerm)
+ */
+export function supportsWindows(): boolean {
+  const adapter = getTerminalAdapter();
+  return adapter?.supportsWindows() ?? false;
+}
+
+/**
+ * Get the name of the currently detected terminal adapter.
+ * 
+ * @returns The adapter name, or null if none detected
+ */
+export function getTerminalName(): string | null {
+  return getTerminalAdapter()?.name ?? null;
+}

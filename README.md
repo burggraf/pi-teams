@@ -45,6 +45,8 @@ pi install npm:pi-teams
 - **Beautiful UI**: Optimized vertical splits in `tmux` with clear labels so you always know who is doing what.
 
 ### Advanced Features
+- **Isolated OS Windows**: Launch teammates in true separate OS windows instead of panes.
+- **Persistent Window Titles**: Windows are automatically titled `[team-name]: [agent-name]` for easy identification in your window manager.
 - **Plan Approval Mode**: Require teammates to submit their implementation plans for your approval before they touch any code.
 - **Broadcast Messaging**: Send a message to the entire team at once for global coordination and announcements.
 - **Quality Gate Hooks**: Automated shell scripts run when tasks are completed (e.g., to run tests or linting).
@@ -58,8 +60,19 @@ pi install npm:pi-teams
 **Set a default model for the whole team:**
 > **You:** "Create a team named 'Research' and use 'gpt-4o' for everyone."
 
+**Start a team in "Separate Windows" mode:**
+> **You:** "Create a team named 'Dev' and open everyone in separate windows."
+*(Supported in iTerm2 and WezTerm only)*
+
 ### 2. Spawn Teammate with Custom Settings
 > **You:** "Spawn a teammate named 'security-bot' in the current folder. Tell them to scan for hardcoded API keys."
+
+**Spawn a specific teammate in a separate window:**
+> **You:** "Spawn 'researcher' in a separate window."
+
+**Move the Team Lead to a separate window:**
+> **You:** "Open the team lead in its own window."
+*(Requires separate_windows mode enabled or iTerm2/WezTerm)*
 
 **Use a different model:**
 > **You:** "Spawn a teammate named 'speed-bot' using 'haiku' to quickly run some benchmarks."
@@ -111,11 +124,15 @@ Simply start `pi` inside a Zellij session. **pi-teams** will detect it via the `
 
 ### Option 3: iTerm2 (macOS)
 
-If you are using **iTerm2** on macOS and are *not* inside tmux or Zellij, **pi-teams** will use AppleScript to automatically split your current window into an optimized layout (1 large Lead pane on the left, Teammates stacked on the right). It will also name the panes with the teammate's agent name for easy identification.
+If you are using **iTerm2** on macOS and are *not* inside tmux or Zellij, **pi-teams** can manage your team in two ways:
+1. **Panes (Default)**: Automatically split your current window into an optimized layout.
+2. **Windows**: Create true separate OS windows for each agent.
+
+It will name the panes or windows with the teammate's agent name for easy identification.
 
 ### Option 4: WezTerm (macOS, Linux, Windows)
 
-**WezTerm** is a GPU-accelerated, cross-platform terminal emulator written in Rust. If you are using WezTerm and are *not* inside tmux or Zellij, **pi-teams** will use `wezterm cli split-pane` to spawn teammates in new panes with an optimized layout (1 large Lead pane on the left, Teammates stacked on the right).
+**WezTerm** is a GPU-accelerated, cross-platform terminal emulator written in Rust. Like iTerm2, it supports both **Panes** and **Separate OS Windows**.
 
 Install WezTerm:
 - **macOS**: `brew install --cask wezterm`

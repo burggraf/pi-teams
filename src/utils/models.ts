@@ -5,6 +5,7 @@ export interface Member {
   model?: string;
   joinedAt: number;
   tmuxPaneId: string;
+  windowId?: string;
   cwd: string;
   subscriptions: any[];
   prompt?: string;
@@ -23,6 +24,7 @@ export interface TeamConfig {
   leadSessionId: string;
   members: Member[];
   defaultModel?: string;
+  separateWindows?: boolean;
 }
 
 export interface TaskFile {

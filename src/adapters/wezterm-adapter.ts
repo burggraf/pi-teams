@@ -163,4 +163,142 @@ export class WezTermAdapter implements TerminalAdapter {
       execCommand(weztermBin, ["cli", "set-tab-title", title]);
     } catch {}
   }
+
+  /**
+   * WezTerm supports spawning separate OS windows via CLI
+   */
+  supportsWindows(): boolean {
+    return this.findWeztermBinary() !== null;
+  }
+
+  /**
+   * Spawn a new separate OS window with the given options.
+   * Uses `wezterm cli spawn --new-window` and sets the window title.
+   */
+  spawnWindow(options: SpawnOptions): string {
+    const weztermBin = this.findWeztermBinary();
+    if (!weztermBin) {
+      throw new Error("WezTerm CLI binary not found.");
+    }
+
+    const envArgs = Object.entries(options.env)
+      .filter(([k]) => k.startsWith("PI_"))
+      .map(([k, v]) => `${k}=${v}`);
+
+    // Format window title as "teamName: agentName" if teamName is provided
+    const windowTitle = options.teamName 
+      ? `${options.teamName}: ${options.name}`
+      : options.name;
+
+    // Spawn a new window
+    const spawnArgs = [
+      "cli", "spawn", "--new-window",
+      "--cwd", options.cwd,
+      "--", "env", ...envArgs, "sh", "-c", options.command
+    ];
+
+    const result = execCommand(weztermBin, spawnArgs);
+    if (result.status !== 0) {
+      throw new Error(`wezterm spawn-window failed: ${result.stderr}`);
+    }
+
+    // The output is the pane ID, we need to find the window ID
+    const paneId = result.stdout.trim();
+    
+    // Query to get window ID from pane ID
+    const windowId = this.getWindowIdFromPaneId(parseInt(paneId, 10));
+    
+    // Set the window title if we found the window
+    if (windowId !== null) {
+      this.setWindowTitle(`wezterm_win_${windowId}`, windowTitle);
+    }
+
+    return `wezterm_win_${windowId || paneId}`;
+  }
+
+  /**
+   * Get window ID from a pane ID by querying WezTerm
+   */
+  private getWindowIdFromPaneId(paneId: number): number | null {
+    const weztermBin = this.findWeztermBinary();
+    if (!weztermBin) return null;
+
+    const result = execCommand(weztermBin, ["cli", "list", "--format", "json"]);
+    if (result.status !== 0) return null;
+
+    try {
+      const allPanes = JSON.parse(result.stdout);
+      const pane = allPanes.find((p: any) => p.pane_id === paneId);
+      return pane?.window_id ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Set the title of a specific window.
+   */
+  setWindowTitle(windowId: string, title: string): void {
+    if (!windowId?.startsWith("wezterm_win_")) return;
+    
+    const weztermBin = this.findWeztermBinary();
+    if (!weztermBin) return;
+
+    const weztermWindowId = windowId.replace("wezterm_win_", "");
+    
+    try {
+      execCommand(weztermBin, ["cli", "set-window-title", "--window-id", weztermWindowId, title]);
+    } catch {
+      // Silently fail
+    }
+  }
+
+  /**
+   * Kill/terminate a window.
+   */
+  killWindow(windowId: string): void {
+    if (!windowId?.startsWith("wezterm_win_")) return;
+    
+    const weztermBin = this.findWeztermBinary();
+    if (!weztermBin) return;
+
+    const weztermWindowId = windowId.replace("wezterm_win_", "");
+    
+    try {
+      // WezTerm doesn't have a direct kill-window command, so we kill all panes in the window
+      const result = execCommand(weztermBin, ["cli", "list", "--format", "json"]);
+      if (result.status !== 0) return;
+
+      const allPanes = JSON.parse(result.stdout);
+      const windowPanes = allPanes.filter((p: any) => p.window_id.toString() === weztermWindowId);
+      
+      for (const pane of windowPanes) {
+        execCommand(weztermBin, ["cli", "kill-pane", "--pane-id", pane.pane_id.toString()]);
+      }
+    } catch {
+      // Silently fail
+    }
+  }
+
+  /**
+   * Check if a window is still alive/active.
+   */
+  isWindowAlive(windowId: string): boolean {
+    if (!windowId?.startsWith("wezterm_win_")) return false;
+    
+    const weztermBin = this.findWeztermBinary();
+    if (!weztermBin) return false;
+
+    const weztermWindowId = windowId.replace("wezterm_win_", "");
+    
+    try {
+      const result = execCommand(weztermBin, ["cli", "list", "--format", "json"]);
+      if (result.status !== 0) return false;
+
+      const allPanes = JSON.parse(result.stdout);
+      return allPanes.some((p: any) => p.window_id.toString() === weztermWindowId);
+    } catch {
+      return false;
+    }
+  }
 }

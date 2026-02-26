@@ -13,7 +13,8 @@ export function createTeam(
   sessionId: string,
   leadAgentId: string,
   description = "",
-  defaultModel?: string
+  defaultModel?: string,
+  separateWindows?: boolean
 ): TeamConfig {
   const dir = teamDir(name);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -39,6 +40,7 @@ export function createTeam(
     leadSessionId: sessionId,
     members: [leadMember],
     defaultModel,
+    separateWindows,
   };
 
   fs.writeFileSync(configPath(name), JSON.stringify(config, null, 2));

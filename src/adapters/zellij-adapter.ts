@@ -59,4 +59,39 @@ export class ZellijAdapter implements TerminalAdapter {
     // Zellij pane titles are set via --name at spawn time
     // No runtime title changing supported
   }
+
+  /**
+   * Zellij does not support spawning separate OS windows
+   */
+  supportsWindows(): boolean {
+    return false;
+  }
+
+  /**
+   * Not supported - throws error
+   */
+  spawnWindow(_options: SpawnOptions): string {
+    throw new Error("Zellij does not support spawning separate OS windows. Use iTerm2 or WezTerm instead.");
+  }
+
+  /**
+   * Not supported - no-op
+   */
+  setWindowTitle(_windowId: string, _title: string): void {
+    // Not supported
+  }
+
+  /**
+   * Not supported - no-op
+   */
+  killWindow(_windowId: string): void {
+    // Not supported
+  }
+
+  /**
+   * Not supported - always returns false
+   */
+  isWindowAlive(_windowId: string): boolean {
+    return false;
+  }
 }

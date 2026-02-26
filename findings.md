@@ -1,47 +1,104 @@
-# Audit Findings for `src/utils`
+# Research Findings: Terminal Window Title Support
 
-I've analyzed the `src/utils` directory for logic bugs and race conditions. Here are my findings:
+## iTerm2 (macOS)
 
-### 1. Critical Deadlock Condition in `src/utils/lock.ts`
-The current `withLock` implementation has no mechanism for lock expiration or stale lock detection.
-- **Problem**: If a process crashes (e.g., due to a power failure or being killed with `SIGKILL`) while holding a lock, the `.lock` file remains on disk forever.
-- **Impact**: All future attempts to acquire the lock for that specific path will fail after 5 seconds of retrying, effectively deadlocking that part of the system until manual cleanup occurs.
-- **Recommendation**: Add logic to check the age of the lock file or verify if the process ID stored in the lock file is still active.
+### New Window Creation
+```applescript
+tell application "iTerm"
+    set newWindow to (create window with default profile)
+    tell current session of newWindow
+        -- Execute command in new window
+        write text "cd /path && command"
+    end tell
+    return id of newWindow  -- Returns window ID
+end tell
+```
 
-### 2. Race Condition in `src/utils/tasks.ts` (Inconsistent Lock Paths)
-Different functions in `tasks.ts` use inconsistent lock file names for the same task resources.
-- **Problem 1**: `updateTask` locks `${taskId}.lock`, while `readTask` locks `${taskId}.json.lock`. These two functions can run concurrently on the same task, potentially leading to corrupt reads/writes.
-- **Problem 2**: `listTasks` and `createTask` lock the task directory (`tasks.lock`), but `updateTask` and `readTask` do not coordinate with this directory-level lock.
-- **Impact**: `listTasks` can read a task file (via `fs.readFileSync`) while `updateTask` is writing to it (via `fs.writeFileSync`) or deleting it (via `fs.unlinkSync`), leading to JSON parsing errors or "File not found" exceptions.
-- **Recommendation**: Standardize on a single lock file naming convention (e.g., always use `${taskId}.json.lock`) and ensure directory-level operations coordinate correctly with individual task operations.
+### Window Title Setting
+**Important:** iTerm2's AppleScript `window` object has a `title` property that is **read-only**.
 
-### 3. Scalability/Memory Issue in `src/utils/messaging.ts`
-The messaging system reads and writes the entire inbox for every single operation.
-- **Problem**: Both `appendMessage` and `readInbox` read the entire agent's inbox into a JSON array, modify it in memory, and then rewrite the entire file back to disk.
-- **Impact**: As an agent's inbox grows over time, this will become increasingly slow and memory-intensive. For very large inboxes, it could lead to Out-Of-Memory (OOM) errors and slow down the entire team's communication.
-- **Recommendation**: Use a streaming or append-only log format for messages, or implement a mechanism to archive/truncate old messages.
+To set the actual window title (OS title bar), use escape sequences:
+```applescript
+tell current session of newWindow
+    -- Set window title via escape sequence (OSC 2)
+    write text "printf '\\033]2;Team: Agent\\007'"
+    -- Optional: Set tab title via session name
+    set name to "Agent"  -- This sets the tab title
+end tell
+```
 
-### 4. Race Condition in `src/utils/teams.ts`
-The `createTeam` function lacks any locking mechanism.
-- **Problem**: If two processes attempt to create the same team simultaneously, they can interfere with each other during directory creation and configuration file writing.
-- **Impact**: Potential for corrupted team configurations or unexpected errors during team setup.
-- **Recommendation**: Add a lock around the team creation process.
+### Escape Sequences Reference
+- `\033]0;Title\007` - Set both icon name and window title
+- `\033]1;Title\007` - Set tab title only (icon name)
+- `\033]2;Title\007` - Set window title only
 
----
+### Required iTerm2 Settings
+- Settings > Profiles > Terminal > "Terminal may set tab/window title" must be enabled
+- May need to disable shell auto-title in `.zshrc` or `.bashrc` to prevent overwriting
 
-## Tester Findings (Confirmed via Tests)
+## WezTerm (Cross-Platform)
 
-I have implemented test cases to verify the above findings and cover edge cases.
+### New Window Creation
+```bash
+# Spawn new OS window
+wezterm cli spawn --new-window --cwd /path -- env KEY=val command
 
-### Confirmed Bugs from Tests:
-- **Bug 2 Verified:** I implemented `src/utils/tasks.test.ts` which demonstrates that `updateTask` and `readTask` can indeed access the same task concurrently because they use different lock file names (`taskId.lock` vs `taskId.json.lock`).
-- **Locking Stress Test:** I implemented `src/utils/messaging.test.ts` with a stress test of 100 concurrent `appendMessage` calls. The `withLock` mechanism correctly serialized the writes, ensuring no data loss.
-- **Lock Acquisition Failure:** I implemented `src/utils/lock.test.ts` which confirms that if a lock file already exists, `withLock` fails after a 5-second timeout.
+# Returns pane ID, need to lookup window ID
+```
 
-### Summary of Coverage:
-- `lock.test.ts`: Covers acquisition, release, timeout, and release-on-failure.
-- `messaging.test.ts`: Covers concurrent appends and unread marking.
-- `tasks.test.ts`: Covers creation, updating, listing, and lock inconsistency verification.
+### Window Title Setting
+```bash
+# Set window title by window ID
+wezterm cli set-window-title --window-id 1 "Team: Agent"
 
-### Recommendation for Project Structure:
-We should standardize the `findings.md`, `task_plan.md`, and `progress.md` files or use agent-specific prefixes (e.g., `tester_findings.md`) to avoid collision between teammates.
+# Or set tab title
+wezterm cli set-tab-title "Agent"
+```
+
+### Getting Window ID
+After spawning, we need to query for the window:
+```bash
+wezterm cli list --format json
+# Returns array with pane_id, window_id, tab_id, etc.
+```
+
+## tmux (Skipped)
+
+- `tmux new-window` creates windows within the same session
+- True OS window creation requires spawning a new terminal process entirely
+- Not supported per user request
+
+## Zellij (Skipped)
+
+- `zellij action new-tab` creates tabs within the same session
+- No native support for creating OS windows
+- Not supported per user request
+
+## Universal Escape Sequences
+
+All terminals supporting xterm escape sequences understand:
+```bash
+# Set window title (OSC 2)
+printf '\033]2;My Window Title\007'
+
+# Alternative syntax
+printf '\e]2;My Window Title\a'
+```
+
+This is the most reliable cross-terminal method for setting window titles.
+
+## Summary Table
+
+| Feature | iTerm2 | WezTerm | tmux | Zellij |
+|---------|--------|---------|------|--------|
+| New OS Window | ✅ AppleScript | ✅ CLI | ❌ | ❌ |
+| Set Window Title | ✅ Escape seq | ✅ CLI | N/A | N/A |
+| Set Tab Title | ✅ AppleScript | ✅ CLI | N/A | N/A |
+| Get Window ID | ✅ AppleScript | ✅ CLI list | N/A | N/A |
+
+## Implementation Notes
+
+1. **iTerm2:** Will use AppleScript for window creation and escape sequences for title setting
+2. **WezTerm:** Will use CLI for both window creation and title setting
+3. **Title Format:** `{teamName}: {agentName}` (e.g., "my-team: security-bot")
+4. **Window Tracking:** Need to store window IDs separately from pane IDs for lifecycle management

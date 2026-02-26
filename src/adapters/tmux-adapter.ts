@@ -74,4 +74,39 @@ export class TmuxAdapter implements TerminalAdapter {
       // Ignore errors
     }
   }
+
+  /**
+   * tmux does not support spawning separate OS windows
+   */
+  supportsWindows(): boolean {
+    return false;
+  }
+
+  /**
+   * Not supported - throws error
+   */
+  spawnWindow(_options: SpawnOptions): string {
+    throw new Error("tmux does not support spawning separate OS windows. Use iTerm2 or WezTerm instead.");
+  }
+
+  /**
+   * Not supported - no-op
+   */
+  setWindowTitle(_windowId: string, _title: string): void {
+    // Not supported
+  }
+
+  /**
+   * Not supported - no-op
+   */
+  killWindow(_windowId: string): void {
+    // Not supported
+  }
+
+  /**
+   * Not supported - always returns false
+   */
+  isWindowAlive(_windowId: string): boolean {
+    return false;
+  }
 }
