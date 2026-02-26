@@ -10,6 +10,136 @@ import { getTerminalAdapter } from "../src/adapters/terminal-registry";
 import { Iterm2Adapter } from "../src/adapters/iterm2-adapter";
 import * as path from "node:path";
 import * as fs from "node:fs";
+import { spawnSync } from "node:child_process";
+
+// Cache for available models
+let availableModelsCache: Array<{ provider: string; model: string }> | null = null;
+let modelsCacheTime = 0;
+const MODELS_CACHE_TTL = 60000; // 1 minute
+
+/**
+ * Query available models from pi --list-models
+ */
+function getAvailableModels(): Array<{ provider: string; model: string }> {
+  const now = Date.now();
+  if (availableModelsCache && now - modelsCacheTime < MODELS_CACHE_TTL) {
+    return availableModelsCache;
+  }
+
+  try {
+    const result = spawnSync("pi", ["--list-models"], {
+      encoding: "utf-8",
+      timeout: 10000,
+    });
+
+    if (result.status !== 0 || !result.stdout) {
+      return [];
+    }
+
+    const models: Array<{ provider: string; model: string }> = [];
+    const lines = result.stdout.split("\n");
+
+    for (const line of lines) {
+      // Skip header line and empty lines
+      if (!line.trim() || line.startsWith("provider")) continue;
+
+      // Parse: provider model context max-out thinking images
+      const parts = line.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        const provider = parts[0];
+        const model = parts[1];
+        if (provider && model) {
+          models.push({ provider, model });
+        }
+      }
+    }
+
+    availableModelsCache = models;
+    modelsCacheTime = now;
+    return models;
+  } catch (e) {
+    return [];
+  }
+}
+
+/**
+ * Provider priority list - OAuth/subscription providers first (cheaper), then API-key providers
+ */
+const PROVIDER_PRIORITY = [
+  // OAuth / Subscription providers (typically free/cheaper)
+  "google-gemini-cli",  // Google Gemini CLI - OAuth, free tier
+  "github-copilot",     // GitHub Copilot - subscription
+  "kimi-sub",           // Kimi subscription
+  // API key providers
+  "anthropic",
+  "openai",
+  "google",
+  "zai",
+  "openrouter",
+  "azure-openai",
+  "amazon-bedrock",
+  "mistral",
+  "groq",
+  "cerebras",
+  "xai",
+  "vercel-ai-gateway",
+];
+
+/**
+ * Find the best matching provider for a given model name.
+ * Returns the full provider/model string or null if not found.
+ */
+function resolveModelWithProvider(modelName: string): string | null {
+  // If already has provider prefix, return as-is
+  if (modelName.includes("/")) {
+    return modelName;
+  }
+
+  const availableModels = getAvailableModels();
+  if (availableModels.length === 0) {
+    return null;
+  }
+
+  const lowerModelName = modelName.toLowerCase();
+
+  // Find all exact matches (case-insensitive) and sort by provider priority
+  const exactMatches = availableModels.filter(
+    (m) => m.model.toLowerCase() === lowerModelName
+  );
+
+  if (exactMatches.length > 0) {
+    // Sort by provider priority (lower index = higher priority)
+    exactMatches.sort((a, b) => {
+      const aIndex = PROVIDER_PRIORITY.indexOf(a.provider);
+      const bIndex = PROVIDER_PRIORITY.indexOf(b.provider);
+      // If provider not in priority list, put it at the end
+      const aPriority = aIndex === -1 ? 999 : aIndex;
+      const bPriority = bIndex === -1 ? 999 : bIndex;
+      return aPriority - bPriority;
+    });
+    return `${exactMatches[0].provider}/${exactMatches[0].model}`;
+  }
+
+  // Try partial match (model name contains the search term)
+  const partialMatches = availableModels.filter((m) =>
+    m.model.toLowerCase().includes(lowerModelName)
+  );
+
+  if (partialMatches.length > 0) {
+    for (const preferredProvider of PROVIDER_PRIORITY) {
+      const match = partialMatches.find(
+        (m) => m.provider === preferredProvider
+      );
+      if (match) {
+        return `${match.provider}/${match.model}`;
+      }
+    }
+    // Return first match if no preferred provider found
+    return `${partialMatches[0].provider}/${partialMatches[0].model}`;
+  }
+
+  return null;
+}
 
 export default function (pi: ExtensionAPI) {
   const isTeammate = !!process.env.PI_AGENT_NAME;
@@ -165,15 +295,17 @@ export default function (pi: ExtensionAPI) {
       const teamConfig = await teams.readConfig(safeTeamName);
       let chosenModel = params.model || teamConfig.defaultModel;
 
-      if (chosenModel && !chosenModel.includes('/')) {
-        if (teamConfig.defaultModel && teamConfig.defaultModel.includes('/')) {
-          const [provider] = teamConfig.defaultModel.split('/');
-          chosenModel = `${provider}/${chosenModel}`;
-        } else {
-          if (chosenModel.startsWith('glm-')) {
-            chosenModel = `zai/${chosenModel}`;
-          } else if (chosenModel.startsWith('claude-')) {
-            chosenModel = `anthropic/${chosenModel}`;
+      // Resolve model to provider/model format
+      if (chosenModel) {
+        if (!chosenModel.includes('/')) {
+          // Try to resolve using available models from pi --list-models
+          const resolved = resolveModelWithProvider(chosenModel);
+          if (resolved) {
+            chosenModel = resolved;
+          } else if (teamConfig.defaultModel && teamConfig.defaultModel.includes('/')) {
+            // Fall back to team default provider
+            const [provider] = teamConfig.defaultModel.split('/');
+            chosenModel = `${provider}/${chosenModel}`;
           }
         }
       }
@@ -205,12 +337,11 @@ export default function (pi: ExtensionAPI) {
       let piCmd = piBinary;
 
       if (chosenModel) {
-        const [provider, ...modelParts] = chosenModel.split('/');
-        const modelName = modelParts.join('/');
+        // Use the combined --model provider/model:thinking format
         if (params.thinking) {
-          piCmd = `${piBinary} --provider ${provider} --model ${modelName}:${params.thinking}`;
+          piCmd = `${piBinary} --model ${chosenModel}:${params.thinking}`;
         } else {
-          piCmd = `${piBinary} --provider ${provider} --model ${modelName}`;
+          piCmd = `${piBinary} --model ${chosenModel}`;
         }
       } else if (params.thinking) {
         piCmd = `${piBinary} --thinking ${params.thinking}`;
@@ -284,8 +415,8 @@ export default function (pi: ExtensionAPI) {
       const piBinary = process.argv[1] ? `node ${process.argv[1]}` : "pi";
       let piCmd = piBinary;
       if (teamConfig.defaultModel) {
-        const [provider, ...modelParts] = teamConfig.defaultModel.split('/');
-        piCmd = `${piBinary} --provider ${provider} --model ${modelParts.join('/')}`;
+        // Use the combined --model provider/model format
+        piCmd = `${piBinary} --model ${teamConfig.defaultModel}`;
       }
 
       const env = { ...process.env, PI_TEAM_NAME: safeTeamName, PI_AGENT_NAME: "team-lead" };
@@ -530,11 +661,14 @@ export default function (pi: ExtensionAPI) {
     async execute(toolCallId, params: any, signal, onUpdate, ctx) {
       const config = await teams.readConfig(params.team_name);
       const member = config.members.find(m => m.name === params.agent_name);
-      if (member) {
-        await killTeammate(params.team_name, member);
-        await teams.removeMember(params.team_name, params.agent_name);
-      }
-      return { content: [{ type: "text", text: `Teammate ${params.agent_name} shutdown processed.` }], details: {} };
+      if (!member) throw new Error(`Teammate ${params.agent_name} not found`);
+
+      await killTeammate(params.team_name, member);
+      await teams.removeMember(params.team_name, params.agent_name);
+      return {
+        content: [{ type: "text", text: `Teammate ${params.agent_name} has been shut down.` }],
+        details: {},
+      };
     },
   });
 }

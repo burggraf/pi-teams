@@ -83,6 +83,17 @@ pi install npm:pi-teams
 **Customize model and thinking level:**
 > **You:** "Spawn a teammate named 'architect-bot' using 'gpt-4o' with 'high' thinking level for deep reasoning."
 
+**Smart Model Resolution:**
+When you specify a model name without a provider (e.g., `gemini-2.5-flash`), pi-teams automatically:
+- Queries available models from `pi --list-models`
+- Prioritizes **OAuth/subscription providers** (cheaper/free) over API-key providers:
+  - `google-gemini-cli` (OAuth) is preferred over `google` (API key)
+  - `github-copilot`, `kimi-sub` are preferred over their API-key equivalents
+- Falls back to API-key providers if OAuth providers aren't available
+- Constructs the correct `--model provider/model:thinking` command
+
+> **Example:** Specifying `gemini-2.5-flash` will automatically use `google-gemini-cli/gemini-2.5-flash` if available, saving API costs.
+
 ### 3. Assign Task & Get Approval
 > **You:** "Create a task for security-bot: 'Check the .env.example file for sensitive defaults' and set it to in_progress."
 
