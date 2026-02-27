@@ -146,8 +146,13 @@ Check if a teammate is still running or has unread messages.
 - `agent_name` (required): Name of the teammate to check
 
 **Returns**: Status information including:
-- Whether the teammate is still running
-- Number of unread messages
+- `alive`: Whether the teammate process/pane/window is still running
+- `unreadCount`: Number of unread inbox messages
+- `health`: One of `healthy`, `idle`, `starting`, `stalled`, `dead`
+- `agentLoopReady`: Whether the teammate has executed its inbox-read loop at least once
+- `hasRecentHeartbeat`: Whether heartbeat data has been updated recently
+- `startupStalled`: Detects the "alive but not consuming inbox" startup failure mode
+- `runtime`: Raw runtime telemetry (timestamps, pid, last error)
 
 **Example**:
 ```javascript
