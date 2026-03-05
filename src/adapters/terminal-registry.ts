@@ -1,6 +1,6 @@
 /**
  * Terminal Registry
- * 
+ *
  * Manages terminal adapters and provides automatic selection based on
  * the current environment.
  */
@@ -49,33 +49,23 @@ let cachedAdapter: TerminalAdapter | null = null;
  */
 export function getTerminalAdapter(): TerminalAdapter | null {
   if (cachedAdapter) {
-    console.log(`[pi-teams debug] Using cached adapter: ${cachedAdapter.name}`);
     return cachedAdapter;
   }
 
-  console.log(`[pi-teams debug] Platform: ${process.platform}`);
-  console.log(`[pi-teams debug] TMUX: ${process.env.TMUX || 'not set'}`);
-  console.log(`[pi-teams debug] ZELLIJ: ${process.env.ZELLIJ || 'not set'}`);
-  console.log(`[pi-teams debug] WEZTERM_PANE: ${process.env.WEZTERM_PANE || 'not set'}`);
-  console.log(`[pi-teams debug] TERM_PROGRAM: ${process.env.TERM_PROGRAM || 'not set'}`);
-
   for (const adapter of adapters) {
-    console.log(`[pi-teams debug] Checking ${adapter.name}...`);
     if (adapter.detect()) {
-      console.log(`[pi-teams debug] Detected: ${adapter.name}`);
       cachedAdapter = adapter;
       return adapter;
     }
   }
 
-  console.log(`[pi-teams debug] No adapter detected!`);
   return null;
 }
 
 /**
  * Get a specific terminal adapter by name.
  *
- * @param name - The adapter name (e.g., "tmux", "iTerm2", "zellij", "WezTerm")
+ * @param name - The adapter name (e.g., "tmux", "iTerm2", "zellij", "WezTerm", "Windows")
  * @returns The adapter instance, or undefined if not found
  */
 export function getAdapterByName(name: string): TerminalAdapter | undefined {
@@ -84,7 +74,7 @@ export function getAdapterByName(name: string): TerminalAdapter | undefined {
 
 /**
  * Get all available adapters.
- * 
+ *
  * @returns Array of all registered adapters
  */
 export function getAllAdapters(): TerminalAdapter[] {
@@ -107,7 +97,7 @@ export function setAdapter(adapter: TerminalAdapter): void {
 
 /**
  * Check if any terminal adapter is available.
- * 
+ *
  * @returns true if a terminal adapter was detected
  */
 export function hasTerminalAdapter(): boolean {
@@ -116,8 +106,8 @@ export function hasTerminalAdapter(): boolean {
 
 /**
  * Check if the current terminal supports spawning separate OS windows.
- * 
- * @returns true if the detected terminal supports windows (iTerm2, WezTerm)
+ *
+ * @returns true if the detected terminal supports windows (iTerm2, WezTerm, Windows)
  */
 export function supportsWindows(): boolean {
   const adapter = getTerminalAdapter();
@@ -126,7 +116,7 @@ export function supportsWindows(): boolean {
 
 /**
  * Get the name of the currently detected terminal adapter.
- * 
+ *
  * @returns The adapter name, or null if none detected
  */
 export function getTerminalName(): string | null {
