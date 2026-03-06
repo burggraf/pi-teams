@@ -5,6 +5,7 @@ import * as paths from "../src/utils/paths";
 import * as teams from "../src/utils/teams";
 import * as tasks from "../src/utils/tasks";
 import * as messaging from "../src/utils/messaging";
+import * as runtime from "../src/utils/runtime";
 import { Member } from "../src/utils/models";
 import { getTerminalAdapter } from "../src/adapters/terminal-registry";
 import { Iterm2Adapter } from "../src/adapters/iterm2-adapter";
@@ -16,6 +17,8 @@ import { spawnSync } from "node:child_process";
 let availableModelsCache: Array<{ provider: string; model: string }> | null = null;
 let modelsCacheTime = 0;
 const MODELS_CACHE_TTL = 60000; // 1 minute
+const HEARTBEAT_STALE_MS = 90000;
+const STARTUP_STALL_MS = 60000;
 
 /**
  * Query available models from pi --list-models
@@ -154,6 +157,13 @@ export default function (pi: ExtensionAPI) {
       if (teamName) {
         const pidFile = path.join(paths.teamDir(teamName), `${agentName}.pid`);
         fs.writeFileSync(pidFile, process.pid.toString());
+        await runtime.writeRuntimeStatus(teamName, agentName, {
+          pid: process.pid,
+          startedAt: Date.now(),
+          lastHeartbeatAt: Date.now(),
+          ready: false,
+          lastError: undefined,
+        });
       }
       ctx.ui.notify(`Teammate: ${agentName} (Team: ${teamName})`, "info");
       ctx.ui.setStatus("00-pi-teams", `[${agentName.toUpperCase()}]`);
@@ -176,9 +186,19 @@ export default function (pi: ExtensionAPI) {
 
       setInterval(async () => {
         if (ctx.isIdle() && teamName) {
-          const unread = await messaging.readInbox(teamName, agentName, true, false);
-          if (unread.length > 0) {
-            pi.sendUserMessage(`I have ${unread.length} new message(s) in my inbox. Reading them now...`);
+          try {
+            const unread = await messaging.readInbox(teamName, agentName, true, false);
+            await runtime.writeRuntimeStatus(teamName, agentName, {
+              lastHeartbeatAt: Date.now(),
+            });
+            if (unread.length > 0) {
+              pi.sendUserMessage(`I have ${unread.length} new message(s) in my inbox. Reading them now...`);
+            }
+          } catch (e) {
+            await runtime.writeRuntimeStatus(teamName, agentName, {
+              lastHeartbeatAt: Date.now(),
+              lastError: String(e),
+            });
           }
         }
       }, 30000);
@@ -192,6 +212,11 @@ export default function (pi: ExtensionAPI) {
       const fullTitle = teamName ? `${teamName}: ${agentName}` : agentName;
       if ((ctx.ui as any).setTitle) (ctx.ui as any).setTitle(fullTitle);
       if (terminal) terminal.setTitle(fullTitle);
+      if (teamName) {
+        await runtime.writeRuntimeStatus(teamName, agentName, {
+          lastHeartbeatAt: Date.now(),
+        });
+      }
     }
   });
 
@@ -199,6 +224,12 @@ export default function (pi: ExtensionAPI) {
   pi.on("before_agent_start", async (event, ctx) => {
     if (isTeammate && firstTurn) {
       firstTurn = false;
+
+      if (teamName) {
+        await runtime.writeRuntimeStatus(teamName, agentName, {
+          lastHeartbeatAt: Date.now(),
+        });
+      }
 
       let modelInfo = "";
       if (teamName) {
@@ -243,6 +274,15 @@ export default function (pi: ExtensionAPI) {
 
     if (member.tmuxPaneId && terminal) {
       terminal.kill(member.tmuxPaneId);
+    }
+
+    const runtimePath = paths.runtimeStatusPath(teamName, member.name);
+    if (fs.existsSync(runtimePath)) {
+      try {
+        fs.unlinkSync(runtimePath);
+      } catch {
+        // ignore
+      }
     }
   }
 
@@ -480,6 +520,16 @@ export default function (pi: ExtensionAPI) {
     async execute(toolCallId, params: any, signal, onUpdate, ctx) {
       const targetAgent = params.agent_name || agentName;
       const msgs = await messaging.readInbox(params.team_name, targetAgent, params.unread_only);
+
+      if (isTeammate && teamName && params.team_name === teamName && targetAgent === agentName) {
+        await runtime.writeRuntimeStatus(teamName, agentName, {
+          lastHeartbeatAt: Date.now(),
+          lastInboxReadAt: Date.now(),
+          ready: true,
+          lastError: undefined,
+        });
+      }
+
       return {
         content: [{ type: "text", text: JSON.stringify(msgs, null, 2) }],
         details: { messages: msgs },
@@ -643,9 +693,35 @@ export default function (pi: ExtensionAPI) {
       }
 
       const unreadCount = (await messaging.readInbox(params.team_name, params.agent_name, true, false)).length;
+      const runtimeStatus = await runtime.readRuntimeStatus(params.team_name, params.agent_name);
+      const now = Date.now();
+      const hasRecentHeartbeat = !!runtimeStatus?.lastHeartbeatAt
+        && (now - runtimeStatus.lastHeartbeatAt) <= HEARTBEAT_STALE_MS;
+      const startupStalled = alive
+        && unreadCount > 0
+        && (now - member.joinedAt) > STARTUP_STALL_MS
+        && !(runtimeStatus?.ready);
+      const health = !alive
+        ? "dead"
+        : startupStalled
+          ? "stalled"
+          : runtimeStatus?.ready
+            ? (hasRecentHeartbeat ? "healthy" : "idle")
+            : "starting";
+
+      const details = {
+        alive,
+        unreadCount,
+        health,
+        agentLoopReady: !!runtimeStatus?.ready,
+        hasRecentHeartbeat,
+        startupStalled,
+        runtime: runtimeStatus,
+      };
+
       return {
-        content: [{ type: "text", text: JSON.stringify({ alive, unreadCount }, null, 2) }],
-        details: { alive, unreadCount },
+        content: [{ type: "text", text: JSON.stringify(details, null, 2) }],
+        details,
       };
     },
   });
