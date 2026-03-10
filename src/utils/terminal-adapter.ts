@@ -21,6 +21,8 @@ export interface SpawnOptions {
   env: Record<string, string>;
   /** Team name for window title formatting (e.g., "team: agent") */
   teamName?: string;
+  /** Optional pane ID to anchor pane-based layouts to a specific origin pane */
+  anchorPaneId?: string;
 }
 
 /**

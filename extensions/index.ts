@@ -378,11 +378,17 @@ export default function (pi: ExtensionAPI) {
             }
           }
 
+          const leadMember = teamConfig.members.find(m => m.name === "team-lead");
+          const anchorPaneId = terminal.name === "tmux"
+            ? leadMember?.tmuxPaneId || process.env.TMUX_PANE || undefined
+            : undefined;
+
           terminalId = terminal.spawn({
             name: safeName,
             cwd: params.cwd,
             command: piCmd,
             env: env,
+            anchorPaneId,
           });
           await teams.updateMember(safeTeamName, safeName, { tmuxPaneId: terminalId });
         }
