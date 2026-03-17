@@ -45,6 +45,7 @@ pi install npm:pi-teams
 - **Beautiful UI**: Optimized vertical splits in `tmux` with clear labels so you always know who is doing what.
 
 ### Advanced Features
+- **Predefined Teams**: Define team templates in `teams.yaml` and spawn entire teams with a single command.
 - **Isolated OS Windows**: Launch teammates in true separate OS windows instead of panes.
 - **Persistent Window Titles**: Windows are automatically titled `[team-name]: [agent-name]` for easy identification in your window manager.
 - **Plan Approval Mode**: Require teammates to submit their implementation plans for your approval before they touch any code.
@@ -105,6 +106,95 @@ Teammates in `planning` mode will use `task_submit_plan`. As the lead, review th
 
 ### 5. Shut Down Team
 > **You:** "We're done. Shut down the team and close the panes."
+
+---
+
+## 🏗️ Predefined Teams
+
+Predefined teams let you define reusable team templates in a `teams.yaml` file. This is perfect for common workflows where you always want the same set of specialists.
+
+### Define Team Templates
+
+Create `~/.pi/teams.yaml` (global) or `.pi/teams.yaml` in your project:
+
+```yaml
+# Full development team
+full:
+  - scout
+  - planner
+  - builder
+  - reviewer
+  - documenter
+
+# Quick plan-build cycle
+plan-build:
+  - planner
+  - builder
+  - reviewer
+
+# Research and documentation
+research:
+  - scout
+  - documenter
+
+# Frontend specialists
+frontend:
+  - planner
+  - builder
+  - bowser
+```
+
+### Define Agent Definitions
+
+Create agent definitions in `~/.pi/agent/agents/` (global) or `.pi/agents/` (project-local):
+
+**scout.md:**
+```markdown
+---
+name: scout
+description: Fast recon and codebase exploration
+tools: read,grep,find,ls
+---
+You are a scout agent. Investigate the codebase quickly and report findings concisely. Do NOT modify any files. Focus on structure, patterns, and key entry points.
+```
+
+**builder.md:**
+```markdown
+---
+name: builder
+description: Implementation specialist
+tools: read,write,edit,bash
+model: claude-sonnet-4
+thinking: medium
+---
+You are a builder agent. Implement code following the plan provided. Write clean, tested code.
+```
+
+**Agent Definition Fields:**
+- `name` (required): The agent's name
+- `description` (required): What the agent does
+- `tools` (optional): Comma or space-separated list of allowed tools
+- `model` (optional): Model to use (e.g., `claude-sonnet-4`, `gpt-4o`)
+- `thinking` (optional): Thinking level (`off`, `minimal`, `low`, `medium`, `high`)
+
+### Use Predefined Teams
+
+**List available team templates:**
+> **You:** "List all predefined teams I can use."
+
+**List available agent definitions:**
+> **You:** "Show me all predefined agents."
+
+**Create a team from a template:**
+> **You:** "Create a team named 'my-project' from the 'plan-build' predefined team in the current directory."
+
+This single command:
+1. Creates the team
+2. Spawns all agents defined in the template
+3. Each agent gets its predefined prompt, tools, model, and thinking settings
+
+**With options:**
+> **You:** "Create a team named 'big-team' from 'full' predefined team using 'gpt-4o' as default model and separate windows."
 
 ---
 

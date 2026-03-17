@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.6] - 2025-03-17
+
+### Added
+- **Predefined Teams**: Define reusable team templates in `teams.yaml` files (#6)
+  - Create `~/.pi/teams.yaml` (global) or `.pi/teams.yaml` (project-local) to define team presets
+  - Define agent configurations in `~/.pi/agent/agents/` or `.pi/agents/` with frontmatter
+  - New tools: `list_predefined_teams`, `list_predefined_agents`, `create_predefined_team`
+  - Agent definitions support: name, description, tools, model, thinking, and custom prompt
+  - Project-local definitions override global definitions
+
+### Changed
+- Improved agent discovery with support for both `.md` files and `SKILL.md` in subdirectories
+
 ## [0.9.5] - 2026-03-17
 
 ### Fixed

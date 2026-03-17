@@ -9,6 +9,7 @@ import * as runtime from "../src/utils/runtime";
 import { Member } from "../src/utils/models";
 import { getTerminalAdapter } from "../src/adapters/terminal-registry";
 import { Iterm2Adapter } from "../src/adapters/iterm2-adapter";
+import * as predefined from "../src/utils/predefined-teams";
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -894,6 +895,218 @@ export default function (pi: ExtensionAPI) {
       return {
         content: [{ type: "text", text: `Teammate ${params.agent_name} has been shut down.` }],
         details: {},
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "list_predefined_teams",
+    label: "List Predefined Teams",
+    description: "List all available predefined team configurations from teams.yaml files. These are team templates that can be instantiated with create_predefined_team.",
+    parameters: Type.Object({}),
+    async execute(toolCallId, params: any, signal, onUpdate, ctx) {
+      const projectDir = ctx.cwd;
+      const predefinedTeams = predefined.getAllPredefinedTeams(projectDir);
+      const agents = predefined.getAllAgentDefinitions(projectDir);
+      
+      const result = predefinedTeams.map(team => {
+        const teamAgents = team.agents.map(agentName => {
+          const agentDef = agents.find(a => a.name === agentName);
+          return {
+            name: agentName,
+            description: agentDef?.description || "(agent definition not found)",
+            found: !!agentDef,
+          };
+        });
+        
+        return {
+          name: team.name,
+          agents: teamAgents,
+        };
+      });
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        details: { teams: result },
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "list_predefined_agents",
+    label: "List Predefined Agents",
+    description: "List all available predefined agent definitions from .md files. These can be used individually or as part of predefined teams.",
+    parameters: Type.Object({}),
+    async execute(toolCallId, params: any, signal, onUpdate, ctx) {
+      const projectDir = ctx.cwd;
+      const agents = predefined.getAllAgentDefinitions(projectDir);
+      
+      const result = agents.map(agent => ({
+        name: agent.name,
+        description: agent.description,
+        tools: agent.tools,
+        model: agent.model,
+        thinking: agent.thinking,
+      }));
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        details: { agents: result },
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "create_predefined_team",
+    label: "Create Predefined Team",
+    description: "Create a team from a predefined team configuration. Spawns all agents defined in the team template from teams.yaml. Each agent is spawned with its predefined prompt, tools, and settings.",
+    parameters: Type.Object({
+      team_name: Type.String({ description: "Name for the new team instance" }),
+      predefined_team: Type.String({ description: "Name of the predefined team template from teams.yaml" }),
+      cwd: Type.String({ description: "Working directory for spawned agents" }),
+      default_model: Type.Optional(Type.String({ description: "Default model for agents without a specified model" })),
+      separate_windows: Type.Optional(Type.Boolean({ default: false, description: "Open teammates in separate OS windows instead of panes" })),
+    }),
+    async execute(toolCallId, params: any, signal, onUpdate, ctx) {
+      const projectDir = ctx.cwd;
+      const predefinedTeam = predefined.getPredefinedTeam(params.predefined_team, projectDir);
+      
+      if (!predefinedTeam) {
+        const available = predefined.getAllPredefinedTeams(projectDir).map(t => t.name);
+        throw new Error(`Predefined team "${params.predefined_team}" not found. Available teams: ${available.join(", ") || "none"}`);
+      }
+
+      if (!terminal) {
+        throw new Error("No terminal adapter detected.");
+      }
+
+      // Create the team
+      const config = teams.createTeam(params.team_name, "local-session", "lead-agent", `Predefined team: ${params.predefined_team}`, params.default_model, params.separate_windows);
+      registerLeadSession(params.team_name);
+
+      const agentDefinitions = predefined.getAllAgentDefinitions(projectDir);
+      const spawnResults: Array<{ name: string; status: string; error?: string }> = [];
+
+      // Spawn each agent in the predefined team
+      for (const agentName of predefinedTeam.agents) {
+        const agentDef = agentDefinitions.find(a => a.name === agentName);
+        
+        if (!agentDef) {
+          spawnResults.push({ name: agentName, status: "skipped", error: "Agent definition not found" });
+          continue;
+        }
+
+        try {
+          const safeName = paths.sanitizeName(agentName);
+          const safeTeamName = paths.sanitizeName(params.team_name);
+          
+          let chosenModel = agentDef.model || params.default_model || config.defaultModel;
+          
+          if (chosenModel && !chosenModel.includes('/')) {
+            const resolved = resolveModelWithProvider(chosenModel);
+            if (resolved) {
+              chosenModel = resolved;
+            } else if (config.defaultModel && config.defaultModel.includes('/')) {
+              const [provider] = config.defaultModel.split('/');
+              chosenModel = `${provider}/${chosenModel}`;
+            }
+          }
+
+          const useSeparateWindow = params.separate_windows ?? config.separateWindows ?? false;
+          if (useSeparateWindow && !terminal.supportsWindows()) {
+            throw new Error(`Separate windows mode is not supported in ${terminal.name}.`);
+          }
+
+          const member: Member = {
+            agentId: `${safeName}@${safeTeamName}`,
+            name: safeName,
+            agentType: "teammate",
+            model: chosenModel,
+            joinedAt: Date.now(),
+            tmuxPaneId: "",
+            cwd: params.cwd,
+            subscriptions: [],
+            prompt: agentDef.prompt,
+            color: "blue",
+            thinking: agentDef.thinking,
+          };
+
+          await teams.addMember(safeTeamName, member);
+          await messaging.sendPlainMessage(safeTeamName, "team-lead", safeName, agentDef.prompt, "Initial prompt from predefined team");
+
+          const piBinary = process.argv[1] ? `node ${process.argv[1]}` : "pi";
+          let piCmd = piBinary;
+
+          if (chosenModel) {
+            if (agentDef.thinking) {
+              piCmd = `${piBinary} --model ${chosenModel}:${agentDef.thinking}`;
+            } else {
+              piCmd = `${piBinary} --model ${chosenModel}`;
+            }
+          } else if (agentDef.thinking) {
+            piCmd = `${piBinary} --thinking ${agentDef.thinking}`;
+          }
+
+          const env: Record<string, string> = {
+            ...process.env,
+            PI_TEAM_NAME: safeTeamName,
+            PI_AGENT_NAME: safeName,
+          };
+
+          let terminalId = "";
+          let isWindow = false;
+
+          try {
+            if (useSeparateWindow) {
+              isWindow = true;
+              terminalId = terminal.spawnWindow({
+                name: safeName,
+                cwd: params.cwd,
+                command: piCmd,
+                env: env,
+                teamName: safeTeamName,
+              });
+              await teams.updateMember(safeTeamName, safeName, { windowId: terminalId });
+            } else {
+              if (terminal instanceof Iterm2Adapter) {
+                const teammates = (await teams.readConfig(safeTeamName)).members.filter(m => m.agentType === "teammate" && m.tmuxPaneId.startsWith("iterm_"));
+                const lastTeammate = teammates.length > 0 ? teammates[teammates.length - 1] : null;
+                if (lastTeammate?.tmuxPaneId) {
+                  terminal.setSpawnContext({ lastSessionId: lastTeammate.tmuxPaneId.replace("iterm_", "") });
+                } else {
+                  terminal.setSpawnContext({});
+                }
+              }
+
+              const leadMember = (await teams.readConfig(safeTeamName)).members.find(m => m.name === "team-lead");
+              const anchorPaneId = terminal.name === "tmux"
+                ? leadMember?.tmuxPaneId || process.env.TMUX_PANE || undefined
+                : undefined;
+
+              terminalId = terminal.spawn({
+                name: safeName,
+                cwd: params.cwd,
+                command: piCmd,
+                env: env,
+                anchorPaneId,
+              });
+              await teams.updateMember(safeTeamName, safeName, { tmuxPaneId: terminalId });
+            }
+
+            spawnResults.push({ name: agentName, status: "spawned", error: undefined });
+          } catch (e) {
+            spawnResults.push({ name: agentName, status: "error", error: `Failed to spawn: ${e}` });
+          }
+        } catch (e) {
+          spawnResults.push({ name: agentName, status: "error", error: String(e) });
+        }
+      }
+
+      const summary = spawnResults.map(r => `${r.name}: ${r.status}${r.error ? ` (${r.error})` : ""}`).join("\n");
+      
+      return {
+        content: [{ type: "text", text: `Team "${params.team_name}" created from predefined team "${params.predefined_team}".\n\nAgent spawn results:\n${summary}` }],
+        details: { teamName: params.team_name, predefinedTeam: params.predefined_team, results: spawnResults },
       };
     },
   });

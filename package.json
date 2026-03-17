@@ -1,6 +1,6 @@
 {
   "name": "pi-teams",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "description": "Agent teams for pi, ported from claude-code-teams-mcp",
   "repository": {
     "type": "git",
@@ -9,7 +9,19 @@
   "author": "Mark Burggraf",
   "license": "MIT",
   "keywords": [
-    "pi-package"
+    "pi-package",
+    "ai-agent",
+    "multi-agent",
+    "agent-teams",
+    "agent-coordination",
+    "autonomous-agents",
+    "task-management",
+    "team-collaboration",
+    "agent-orchestration",
+    "coding-assistant",
+    "terminal",
+    "tmux",
+    "zellij"
   ],
   "scripts": {
     "test": "vitest run"
