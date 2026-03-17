@@ -32,6 +32,10 @@ export function inboxPath(teamName: string, agentName: string) {
   return path.join(teamDir(teamName), "inboxes", `${sanitizeName(agentName)}.json`);
 }
 
+export function runtimeStatusPath(teamName: string, agentName: string) {
+  return path.join(teamDir(teamName), "runtime", `${sanitizeName(agentName)}.json`);
+}
+
 export function configPath(teamName: string) {
   return path.join(teamDir(teamName), "config.json");
 }
