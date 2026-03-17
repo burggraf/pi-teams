@@ -17,8 +17,6 @@ import { spawnSync } from "node:child_process";
 let availableModelsCache: Array<{ provider: string; model: string }> | null = null;
 let modelsCacheTime = 0;
 const MODELS_CACHE_TTL = 60000; // 1 minute
-const HEARTBEAT_STALE_MS = 90000;
-const STARTUP_STALL_MS = 60000;
 
 /**
  * Query available models from pi --list-models
@@ -197,7 +195,7 @@ export default function (pi: ExtensionAPI) {
           } catch (e) {
             await runtime.writeRuntimeStatus(teamName, agentName, {
               lastHeartbeatAt: Date.now(),
-              lastError: String(e),
+              lastError: runtime.createRuntimeError(e),
             });
           }
         }
@@ -276,14 +274,7 @@ export default function (pi: ExtensionAPI) {
       terminal.kill(member.tmuxPaneId);
     }
 
-    const runtimePath = paths.runtimeStatusPath(teamName, member.name);
-    if (fs.existsSync(runtimePath)) {
-      try {
-        fs.unlinkSync(runtimePath);
-      } catch {
-        // ignore
-      }
-    }
+    await runtime.deleteRuntimeStatus(teamName, member.name);
   }
 
   // Tools
@@ -696,10 +687,10 @@ export default function (pi: ExtensionAPI) {
       const runtimeStatus = await runtime.readRuntimeStatus(params.team_name, params.agent_name);
       const now = Date.now();
       const hasRecentHeartbeat = !!runtimeStatus?.lastHeartbeatAt
-        && (now - runtimeStatus.lastHeartbeatAt) <= HEARTBEAT_STALE_MS;
+        && (now - runtimeStatus.lastHeartbeatAt) <= runtime.HEARTBEAT_STALE_MS;
       const startupStalled = alive
         && unreadCount > 0
-        && (now - member.joinedAt) > STARTUP_STALL_MS
+        && (now - member.joinedAt) > runtime.STARTUP_STALL_MS
         && !(runtimeStatus?.ready);
       const health = !alive
         ? "dead"
@@ -718,6 +709,11 @@ export default function (pi: ExtensionAPI) {
         startupStalled,
         runtime: runtimeStatus,
       };
+
+      // Clean up runtime status for dead teammates
+      if (!alive && runtimeStatus) {
+        await runtime.deleteRuntimeStatus(params.team_name, params.agent_name);
+      }
 
       return {
         content: [{ type: "text", text: JSON.stringify(details, null, 2) }],
