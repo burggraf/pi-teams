@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.3] - 2026-03-17
+
+### Fixed
+- Team leads now automatically subscribe to their inbox and poll for messages (#9)
+- Leads no longer need to call `spawn_lead_window` just to receive messages from teammates
+- Lead session is registered via PID tracking when `team_create` is called
+
+### Changed
+- Inbox polling now runs for both team leads and teammates (any agent with team context)
+- Added `findLeadTeamForSession()` to detect lead membership without environment variables
+- Added `registerLeadSession()` to track which session is the lead for a team
+- Added `leadSessionPath()` to paths module for lead session file location
+
 ## [0.9.2] - 2026-03-17
 
 ### Fixed

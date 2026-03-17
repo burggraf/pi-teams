@@ -142,10 +142,55 @@ function resolveModelWithProvider(modelName: string): string | null {
   return null;
 }
 
+/**
+ * Find the team this session is the lead for (if any).
+ * Checks the lead-session.json file to match PID.
+ */
+function findLeadTeamForSession(): string | null {
+  try {
+    const teamsDir = paths.TEAMS_DIR;
+    if (!fs.existsSync(teamsDir)) return null;
+
+    for (const teamDir of fs.readdirSync(teamsDir)) {
+      const sessionFile = paths.leadSessionPath(teamDir);
+      if (fs.existsSync(sessionFile)) {
+        try {
+          const session = JSON.parse(fs.readFileSync(sessionFile, "utf-8"));
+          if (session.pid === process.pid) {
+            return teamDir;
+          }
+        } catch {
+          // Ignore corrupted session files
+        }
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Register this session as the lead for a team.
+ */
+function registerLeadSession(teamName: string) {
+  const sessionFile = paths.leadSessionPath(teamName);
+  const dir = path.dirname(sessionFile);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(sessionFile, JSON.stringify({
+    pid: process.pid,
+    startedAt: Date.now(),
+  }));
+}
+
 export default function (pi: ExtensionAPI) {
   const isTeammate = !!process.env.PI_AGENT_NAME;
   const agentName = process.env.PI_AGENT_NAME || "team-lead";
-  const teamName = process.env.PI_TEAM_NAME;
+  const envTeamName = process.env.PI_TEAM_NAME;
+
+  // For leads without PI_TEAM_NAME, check if we're registered as lead for a team
+  const detectedTeamName = envTeamName || findLeadTeamForSession();
+  const teamName = detectedTeamName;
 
   const terminal = getTerminalAdapter();
 
@@ -181,27 +226,34 @@ export default function (pi: ExtensionAPI) {
       setTimeout(() => {
         pi.sendUserMessage(`I am starting my work as '${agentName}' on team '${teamName}'. Checking my inbox for instructions...`);
       }, 1000);
+    } else if (teamName) {
+      ctx.ui.setStatus("pi-teams", `Lead @ ${teamName}`);
+    }
 
+    // Inbox polling for BOTH teammates AND team-leads (anyone with teamName)
+    if (teamName) {
       setInterval(async () => {
-        if (ctx.isIdle() && teamName) {
+        if (ctx.isIdle()) {
           try {
             const unread = await messaging.readInbox(teamName, agentName, true, false);
-            await runtime.writeRuntimeStatus(teamName, agentName, {
-              lastHeartbeatAt: Date.now(),
-            });
+            if (isTeammate) {
+              await runtime.writeRuntimeStatus(teamName, agentName, {
+                lastHeartbeatAt: Date.now(),
+              });
+            }
             if (unread.length > 0) {
               pi.sendUserMessage(`I have ${unread.length} new message(s) in my inbox. Reading them now...`);
             }
           } catch (e) {
-            await runtime.writeRuntimeStatus(teamName, agentName, {
-              lastHeartbeatAt: Date.now(),
-              lastError: runtime.createRuntimeError(e),
-            });
+            if (isTeammate) {
+              await runtime.writeRuntimeStatus(teamName, agentName, {
+                lastHeartbeatAt: Date.now(),
+                lastError: runtime.createRuntimeError(e),
+              });
+            }
           }
         }
       }, 30000);
-    } else if (teamName) {
-      ctx.ui.setStatus("pi-teams", `Lead @ ${teamName}`);
     }
   });
 
@@ -290,6 +342,8 @@ export default function (pi: ExtensionAPI) {
     }),
     async execute(toolCallId, params: any, signal, onUpdate, ctx) {
       const config = teams.createTeam(params.team_name, "local-session", "lead-agent", params.description, params.default_model, params.separate_windows);
+      // Register this session as the lead so it can receive inbox messages
+      registerLeadSession(params.team_name);
       return {
         content: [{ type: "text", text: `Team ${params.team_name} created.` }],
         details: { config },

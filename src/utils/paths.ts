@@ -39,3 +39,7 @@ export function runtimeStatusPath(teamName: string, agentName: string) {
 export function configPath(teamName: string) {
   return path.join(teamDir(teamName), "config.json");
 }
+
+export function leadSessionPath(teamName: string) {
+  return path.join(teamDir(teamName), "lead-session.json");
+}
