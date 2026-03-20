@@ -18,6 +18,7 @@ export class WindowsAdapter implements TerminalAdapter {
   ];
 
   private wtPath: string | null = null;
+  private psPath: string | null = null;
 
   private findWtBinary(): string | null {
     if (this.wtPath !== null) {
@@ -60,6 +61,42 @@ export class WindowsAdapter implements TerminalAdapter {
 
     this.wtPath = null;
     return null;
+  }
+
+  /**
+   * Find the PowerShell binary to use.
+   * Prefers PowerShell Core (pwsh) if available, falls back to Windows PowerShell (powershell).
+   */
+  private findPsBinary(): string {
+    if (this.psPath !== null) {
+      return this.psPath;
+    }
+
+    // Try pwsh (PowerShell Core / PowerShell 7+) first
+    try {
+      const result = execCommand("pwsh", ["-NoProfile", "-Command", "echo 'found'"]);
+      if (result.status === 0 && result.stdout.trim() === "found") {
+        this.psPath = "pwsh";
+        return "pwsh";
+      }
+    } catch {
+      // pwsh not found, try powershell
+    }
+
+    // Fall back to powershell (Windows PowerShell 5.1)
+    try {
+      const result = execCommand("powershell", ["-NoProfile", "-Command", "echo 'found'"]);
+      if (result.status === 0 && result.stdout.trim() === "found") {
+        this.psPath = "powershell";
+        return "powershell";
+      }
+    } catch {
+      // powershell not found either
+    }
+
+    // Default to powershell as it's built into Windows
+    this.psPath = "powershell";
+    return "powershell";
   }
 
   detect(): boolean {
@@ -111,6 +148,7 @@ export class WindowsAdapter implements TerminalAdapter {
       throw new Error("Windows Terminal (wt) CLI binary not found.");
     }
 
+    const psBin = this.findPsBinary();
     const panes = this.getPanes();
 
     // Build environment variables for PowerShell
@@ -134,7 +172,7 @@ export class WindowsAdapter implements TerminalAdapter {
         "split-pane",
         "--vertical",
         "--size", "50%",
-        "--", "pwsh", "-NoExit", "-Command", psCommand
+        "--", psBin, "-NoExit", "-Command", psCommand
       ];
     } else {
       // Create a new tab for subsequent panes (Windows Terminal limitation)
@@ -143,7 +181,7 @@ export class WindowsAdapter implements TerminalAdapter {
         "split-pane",
         "--horizontal",
         "--size", "50%",
-        "--", "pwsh", "-NoExit", "-Command", psCommand
+        "--", psBin, "-NoExit", "-Command", psCommand
       ];
     }
 
@@ -205,6 +243,8 @@ export class WindowsAdapter implements TerminalAdapter {
       throw new Error("Windows Terminal (wt) CLI binary not found.");
     }
 
+    const psBin = this.findPsBinary();
+
     // Build environment variables for PowerShell
     const envVars = Object.entries(options.env)
       .filter(([k]) => k.startsWith("PI_"))
@@ -223,7 +263,7 @@ export class WindowsAdapter implements TerminalAdapter {
     const spawnArgs = [
       "new-window",
       "--title", windowTitle,
-      "--", "pwsh", "-NoExit", "-Command", psCommand
+      "--", psBin, "-NoExit", "-Command", psCommand
     ];
 
     const result = execCommand(wtBin, spawnArgs);

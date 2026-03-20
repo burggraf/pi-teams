@@ -94,6 +94,8 @@ describe("WindowsAdapter", () => {
       Object.defineProperty(process, "platform", { value: "win32" });
       // Mock findWtBinary check
       mockExecCommand.mockReturnValueOnce({ stdout: "wt", status: 0 });
+      // Mock findPsBinary check (pwsh found)
+      mockExecCommand.mockReturnValueOnce({ stdout: "found", status: 0 });
       // Mock getPanes - no existing panes
       mockExecCommand.mockReturnValueOnce({ stdout: "[]", status: 0 });
       // Mock actual spawn
@@ -114,6 +116,8 @@ describe("WindowsAdapter", () => {
       Object.defineProperty(process, "platform", { value: "win32" });
       // Mock findWtBinary check
       mockExecCommand.mockReturnValueOnce({ stdout: "wt", status: 0 });
+      // Mock findPsBinary check (pwsh found)
+      mockExecCommand.mockReturnValueOnce({ stdout: "found", status: 0 });
       // Mock getPanes - existing panes
       mockExecCommand.mockReturnValueOnce({ stdout: '[{"window":1}]', status: 0 });
       // Mock actual spawn
@@ -169,6 +173,8 @@ describe("WindowsAdapter", () => {
       Object.defineProperty(process, "platform", { value: "win32" });
       // Mock findWtBinary check
       mockExecCommand.mockReturnValueOnce({ stdout: "wt", status: 0 });
+      // Mock findPsBinary check (pwsh found)
+      mockExecCommand.mockReturnValueOnce({ stdout: "found", status: 0 });
       // Mock actual spawn
       mockExecCommand.mockReturnValueOnce({ stdout: "", status: 0 });
 
@@ -182,6 +188,31 @@ describe("WindowsAdapter", () => {
 
       // Returns synthetic ID: windows_win_<timestamp>_<name>
       expect(windowId).toMatch(/^windows_win_\d+_team-lead$/);
+    });
+
+    it("should fallback to powershell when pwsh is not available", () => {
+      Object.defineProperty(process, "platform", { value: "win32" });
+      // Mock findWtBinary check
+      mockExecCommand.mockReturnValueOnce({ stdout: "wt", status: 0 });
+      // Mock findPsBinary check - pwsh fails, powershell succeeds
+      mockExecCommand.mockReturnValueOnce({ stdout: "", status: 1 }); // pwsh not found
+      mockExecCommand.mockReturnValueOnce({ stdout: "found", status: 0 }); // powershell found
+      // Mock actual spawn
+      mockExecCommand.mockReturnValueOnce({ stdout: "", status: 0 });
+
+      const windowId = adapter.spawnWindow({
+        name: "team-lead",
+        cwd: "/test/path",
+        command: "pi",
+        env: {},
+      });
+
+      expect(windowId).toMatch(/^windows_win_\d+_team-lead$/);
+      // Verify that powershell was used (check the call args)
+      const lastCall = mockExecCommand.mock.calls[mockExecCommand.mock.calls.length - 1];
+      expect(lastCall[0]).toBe("wt");
+      // The command should use 'powershell' not 'pwsh'
+      expect(lastCall[1]).toContain("powershell");
     });
   });
 

@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.10] - 2025-03-20
+
+### Fixed
+- **Windows PowerShell compatibility**: Added fallback to Windows PowerShell 5.1 (`powershell`) when PowerShell Core (`pwsh`) is not available (#12)
+  - Windows adapter now auto-detects available PowerShell at runtime
+  - Prefers PowerShell Core (pwsh) if installed, falls back to built-in Windows PowerShell
+  - Users without PowerShell Core installed can now use pi-teams on Windows
+
 ## [0.9.9] - 2025-03-19
 
 ### Fixed

@@ -1,6 +1,6 @@
 {
   "name": "pi-teams",
-  "version": "0.9.9",
+  "version": "0.9.10",
   "description": "Agent teams for pi, ported from claude-code-teams-mcp",
   "repository": {
     "type": "git",
