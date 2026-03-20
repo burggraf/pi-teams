@@ -7,6 +7,8 @@
 
 import { TerminalAdapter, SpawnOptions, execCommand } from "../utils/terminal-adapter";
 import { spawnSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as paths from "../utils/paths";
 
 /**
  * Context needed for iTerm2 spawning (tracks last pane for layout)
@@ -19,6 +21,8 @@ export interface Iterm2SpawnContext {
 export class Iterm2Adapter implements TerminalAdapter {
   readonly name = "iTerm2";
   private spawnContext: Iterm2SpawnContext = {};
+  /** Cached iTerm2 session ID for this process (looked up from team config) */
+  private cachedOwnSessionId: string | null | undefined = undefined;
 
   detect(): boolean {
     return process.env.TERM_PROGRAM === "iTerm.app" && !process.env.TMUX && !process.env.ZELLIJ;
@@ -146,6 +150,38 @@ end tell`;
 
   setTitle(title: string): void {
     const escapedTitle = title.replace(/"/g, '\\"');
+
+    // For teammate processes, find the specific session to avoid renaming
+    // unrelated iTerm2 tabs. The session ID is stored in the team config.
+    const sessionId = this.findOwnSessionId();
+    if (sessionId) {
+      const script = `tell application "iTerm2"
+  repeat with aWindow in windows
+    repeat with aTab in tabs of aWindow
+      repeat with aSession in sessions of aTab
+        if id of aSession is "${sessionId}" then
+          set name of aSession to "${escapedTitle}"
+          return "Found"
+        end if
+      end repeat
+    end repeat
+  end repeat
+end tell`;
+      try {
+        this.runAppleScript(script);
+      } catch {
+        // Ignore errors
+      }
+      return;
+    }
+
+    // If we're a teammate but haven't found our session ID yet (race condition
+    // during startup), skip the rename to avoid overwriting an unrelated tab.
+    if (process.env.PI_AGENT_NAME) {
+      return;
+    }
+
+    // Fallback for non-teammate processes (e.g., standalone pi sessions).
     const script = `tell application "iTerm2" to tell current session of current window
       set name to "${escapedTitle}"
     end tell`;
@@ -154,6 +190,40 @@ end tell`;
     } catch {
       // Ignore errors
     }
+  }
+
+  /**
+   * Look up this process's iTerm2 session ID from the team config.
+   * Teammates have PI_AGENT_NAME and PI_TEAM_NAME env vars, and the
+   * team config stores the iTerm2 session ID in the tmuxPaneId field.
+   * Caches the result once found to avoid repeated file reads.
+   */
+  private findOwnSessionId(): string | null {
+    // Return cached value if we've already found it
+    if (this.cachedOwnSessionId != null) return this.cachedOwnSessionId;
+
+    const agentName = process.env.PI_AGENT_NAME;
+    const teamName = process.env.PI_TEAM_NAME;
+    if (!agentName || !teamName) return null;
+
+    try {
+      const configFile = paths.configPath(teamName);
+      const config = JSON.parse(fs.readFileSync(configFile, "utf-8"));
+      const member = config.members?.find((m: any) => m.name === agentName);
+      if (
+        member?.tmuxPaneId &&
+        member.tmuxPaneId.startsWith("iterm_") &&
+        !member.tmuxPaneId.startsWith("iterm_win_")
+      ) {
+        this.cachedOwnSessionId = member.tmuxPaneId.replace("iterm_", "");
+        return this.cachedOwnSessionId;
+      }
+    } catch {
+      // Config not yet available — will retry on next call
+    }
+
+    // Don't cache null — the config might not be written yet (timing)
+    return null;
   }
 
   /**
