@@ -333,12 +333,42 @@ export default function (pi: ExtensionAPI) {
 
   // For leads without PI_TEAM_NAME, check if we're registered as lead for a team
   const detectedTeamName = envTeamName || findLeadTeamForSession();
-  const teamName = detectedTeamName;
+  let teamName = detectedTeamName;
 
   const terminal = getTerminalAdapter();
 
+  // Track whether lead inbox polling has been started (to avoid duplicates)
+  let leadPollingStarted = false;
+  let sessionCtx: any = null;
+
+  /**
+   * Start inbox polling for the team lead.
+   * Called when a team is created or when the lead reconnects to an existing team.
+   * Requires sessionCtx to be set (from session_start).
+   */
+  function startLeadInboxPolling() {
+    if (leadPollingStarted || isTeammate || !sessionCtx) return;
+    leadPollingStarted = true;
+
+    setInterval(async () => {
+      if (!teamName) return;
+      if (sessionCtx.isIdle()) {
+        try {
+          const unread = await messaging.readInbox(teamName, agentName, true, false);
+          if (unread.length > 0) {
+            pi.sendUserMessage(`I have ${unread.length} new message(s) in my inbox. Reading them now...`);
+          }
+        } catch {
+          // Ignore errors for lead polling
+        }
+      }
+    }, 30000);
+  }
+
   pi.on("session_start", async (_event, ctx) => {
     paths.ensureDirs();
+    sessionCtx = ctx;
+
     if (isTeammate) {
       if (teamName) {
         const pidFile = path.join(paths.teamDir(teamName), `${agentName}.pid`);
@@ -369,34 +399,32 @@ export default function (pi: ExtensionAPI) {
       setTimeout(() => {
         pi.sendUserMessage(`I am starting my work as '${agentName}' on team '${teamName}'. Checking my inbox for instructions...`);
       }, 1000);
-    } else if (teamName) {
-      ctx.ui.setStatus("pi-teams", `Lead @ ${teamName}`);
-    }
 
-    // Inbox polling for BOTH teammates AND team-leads (anyone with teamName)
-    if (teamName) {
-      setInterval(async () => {
-        if (ctx.isIdle()) {
-          try {
-            const unread = await messaging.readInbox(teamName, agentName, true, false);
-            if (isTeammate) {
-              await runtime.writeRuntimeStatus(teamName, agentName, {
+      // Inbox polling for teammates
+      if (teamName) {
+        setInterval(async () => {
+          if (ctx.isIdle()) {
+            try {
+              const unread = await messaging.readInbox(teamName!, agentName, true, false);
+              await runtime.writeRuntimeStatus(teamName!, agentName, {
                 lastHeartbeatAt: Date.now(),
               });
-            }
-            if (unread.length > 0) {
-              pi.sendUserMessage(`I have ${unread.length} new message(s) in my inbox. Reading them now...`);
-            }
-          } catch (e) {
-            if (isTeammate) {
-              await runtime.writeRuntimeStatus(teamName, agentName, {
+              if (unread.length > 0) {
+                pi.sendUserMessage(`I have ${unread.length} new message(s) in my inbox. Reading them now...`);
+              }
+            } catch (e) {
+              await runtime.writeRuntimeStatus(teamName!, agentName, {
                 lastHeartbeatAt: Date.now(),
                 lastError: runtime.createRuntimeError(e),
               });
             }
           }
-        }
-      }, 30000);
+        }, 30000);
+      }
+    } else if (teamName) {
+      // Lead reconnecting to an existing team
+      ctx.ui.setStatus("pi-teams", `Lead @ ${teamName}`);
+      startLeadInboxPolling();
     }
   });
 
@@ -493,6 +521,9 @@ export default function (pi: ExtensionAPI) {
       const config = teams.createTeam(params.team_name, "local-session", "lead-agent", params.description, params.default_model, params.separate_windows);
       // Register this session as the lead so it can receive inbox messages
       registerLeadSession(params.team_name);
+      // Update teamName and start inbox polling for the lead
+      teamName = params.team_name;
+      startLeadInboxPolling();
       return {
         content: [{ type: "text", text: `Team ${params.team_name} created.` }],
         details: { config },
@@ -1077,6 +1108,9 @@ export default function (pi: ExtensionAPI) {
       // Create the team
       const config = teams.createTeam(params.team_name, "local-session", "lead-agent", `Predefined team: ${params.predefined_team}`, params.default_model, params.separate_windows);
       registerLeadSession(params.team_name);
+      // Update teamName and start inbox polling for the lead
+      teamName = params.team_name;
+      startLeadInboxPolling();
 
       const agentDefinitions = predefined.getAllAgentDefinitions(projectDir);
       const spawnResults: Array<{ name: string; status: string; error?: string }> = [];
