@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.12] - 2025-03-20
+
+### Fixed
+- **Improved shim-based install support**: Enhanced `getPiLaunchCommand()` to better handle Volta and other shim-based toolchains (#13)
+  - Detects script files by extension (.js, .mjs, .cjs, .ts, .mts, .cts) and path pattern
+  - Explicitly excludes `node` and `bun` from execPath fallback
+  - Falls back to `pi` from PATH for shim-based installs, which is more reliable
+  - Thanks to the contributor for the comprehensive fix
+
+## [0.9.11] - 2025-03-20
+
+### Fixed
+- **Regression fix for Node-based installs**: Fixed a regression introduced in v0.9.9 that broke regular Node-based pi installs (#10)
+  - Previous fix prioritized `process.execPath` which points to the Node interpreter, not the pi script
+  - Now checks if `argv[1]` is a real "pi" file on disk before falling back to `execPath`
+  - Correctly handles both Bun-compiled binaries and regular Node installs
+  - Thanks to @jacek-schefler for reporting and providing the fix
+
 ## [0.9.10] - 2025-03-20
 
 ### Fixed
