@@ -18,23 +18,39 @@ import { spawnSync } from "node:child_process";
 /**
  * Build the command used to relaunch pi for teammate processes.
  *
- * In Bun-compiled pi binaries, process.argv[1] points at a virtual $bunfs path
- * like /$bunfs/root/pi, which is not a real file and breaks when prefixed with
- * `node`. process.execPath points at the actual executable in both compiled and
- * regular environments, so prefer that when available.
+ * Handles multiple installation scenarios:
+ *
+ * 1. Regular Node installs: argv[1] is the real pi launcher script on disk
+ *    - execPath = /path/to/node (the interpreter)
+ *    - argv[1] = /path/to/pi (the script)
+ *    - We need to run the pi script directly (it has a shebang)
+ *
+ * 2. Bun-compiled binaries: argv[1] points to a virtual $bunfs path that
+ *    doesn't exist on disk. execPath is the actual executable.
+ *    - execPath = /path/to/pi-binary (the compiled executable)
+ *    - argv[1] = /$bunfs/root/pi (virtual path, doesn't exist)
+ *
+ * 3. Fallback: If neither works, just use "pi" and hope it's on PATH.
  */
 function getPiLaunchCommand(): string {
-  // If we have an execPath, use it directly (works for both compiled binaries and node scripts)
+  const argv1 = process.argv[1];
+
+  // First, check if argv[1] is a real "pi" file on disk (regular Node install)
+  if (argv1 && path.basename(argv1) === "pi" && fs.existsSync(argv1)) {
+    return JSON.stringify(argv1);
+  }
+
+  // For Bun-compiled binaries, execPath is the actual executable
   if (process.execPath) {
     return JSON.stringify(process.execPath);
   }
 
-  // Fallback: try argv[1] with node prefix for regular node environments
-  if (process.argv[1]) {
-    return `node ${JSON.stringify(process.argv[1])}`;
+  // Fallback: try node with argv[1]
+  if (argv1) {
+    return `node ${JSON.stringify(argv1)}`;
   }
 
-  // Last resort: just use "pi" and hope it's on PATH
+  // Last resort: just "pi"
   return "pi";
 }
 

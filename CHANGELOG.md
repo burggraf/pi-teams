@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.11] - 2025-03-20
+
+### Fixed
+- **Regression fix for Node-based installs**: Fixed a regression introduced in v0.9.9 that broke regular Node-based pi installs (#10)
+  - Previous fix prioritized `process.execPath` which points to the Node interpreter, not the pi script
+  - Now checks if `argv[1]` is a real "pi" file on disk before falling back to `execPath`
+  - Correctly handles both Bun-compiled binaries and regular Node installs
+  - Thanks to @jacek-schefler for reporting and providing the fix
+
 ## [0.9.10] - 2025-03-20
 
 ### Fixed
