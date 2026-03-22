@@ -11,6 +11,7 @@ import {
   getAllPredefinedTeams,
   getAgentDefinition,
   getPredefinedTeam,
+  saveTeamTemplate,
 } from "./predefined-teams";
 
 describe("parseAgentFrontmatter", () => {
@@ -256,7 +257,8 @@ full:
 
 describe("getAllAgentDefinitions and getAllPredefinedTeams", () => {
   const globalDir = path.join(os.homedir(), ".pi", "agent", "agents");
-  const globalTeamsDir = path.join(os.homedir(), ".pi", "agent");
+  const globalTeamsDir = path.join(os.homedir(), ".pi");
+  const legacyGlobalTeamsDir = path.join(os.homedir(), ".pi", "agent");
   const projectDir = path.join(os.tmpdir(), "pi-teams-test-project-" + Date.now());
   const projectAgentsDir = path.join(projectDir, ".pi", "agents");
   const projectTeamsDir = path.join(projectDir, ".pi");
@@ -264,6 +266,7 @@ describe("getAllAgentDefinitions and getAllPredefinedTeams", () => {
   // Store original files to restore later
   let originalGlobalAgents: string[] = [];
   let originalGlobalTeams: string | null = null;
+  let originalLegacyGlobalTeams: string | null = null;
 
   beforeEach(() => {
     // Create project directory
@@ -279,11 +282,30 @@ describe("getAllAgentDefinitions and getAllPredefinedTeams", () => {
     if (fs.existsSync(path.join(globalTeamsDir, "teams.yaml"))) {
       originalGlobalTeams = fs.readFileSync(path.join(globalTeamsDir, "teams.yaml"), "utf-8");
     }
+    if (fs.existsSync(path.join(legacyGlobalTeamsDir, "teams.yaml"))) {
+      originalLegacyGlobalTeams = fs.readFileSync(path.join(legacyGlobalTeamsDir, "teams.yaml"), "utf-8");
+    }
   });
 
   afterEach(() => {
     if (fs.existsSync(projectDir)) {
       fs.rmSync(projectDir, { recursive: true });
+    }
+
+    const globalTeamsPath = path.join(globalTeamsDir, "teams.yaml");
+    if (originalGlobalTeams === null) {
+      if (fs.existsSync(globalTeamsPath)) fs.rmSync(globalTeamsPath);
+    } else {
+      fs.mkdirSync(globalTeamsDir, { recursive: true });
+      fs.writeFileSync(globalTeamsPath, originalGlobalTeams);
+    }
+
+    const legacyGlobalTeamsPath = path.join(legacyGlobalTeamsDir, "teams.yaml");
+    if (originalLegacyGlobalTeams === null) {
+      if (fs.existsSync(legacyGlobalTeamsPath)) fs.rmSync(legacyGlobalTeamsPath);
+    } else {
+      fs.mkdirSync(legacyGlobalTeamsDir, { recursive: true });
+      fs.writeFileSync(legacyGlobalTeamsPath, originalLegacyGlobalTeams);
     }
   });
 
@@ -329,6 +351,37 @@ custom:
     // Should include project-local team
     expect(result.find(t => t.name === "custom")).toBeDefined();
     expect(result.find(t => t.name === "custom")?.agents).toEqual(["agent1", "agent2"]);
+  });
+
+  it("reads global predefined teams from ~/.pi/teams.yaml", () => {
+    fs.mkdirSync(globalTeamsDir, { recursive: true });
+    fs.writeFileSync(path.join(globalTeamsDir, "teams.yaml"), `
+root-global:
+  - scout
+`);
+
+    const result = getAllPredefinedTeams();
+
+    expect(result.find(t => t.name === "root-global")).toBeDefined();
+    expect(result.find(t => t.name === "root-global")?.agents).toEqual(["scout"]);
+  });
+
+  it("falls back to legacy ~/.pi/agent/teams.yaml when needed", () => {
+    const globalTeamsPath = path.join(globalTeamsDir, "teams.yaml");
+    if (fs.existsSync(globalTeamsPath)) {
+      fs.rmSync(globalTeamsPath);
+    }
+
+    fs.mkdirSync(legacyGlobalTeamsDir, { recursive: true });
+    fs.writeFileSync(path.join(legacyGlobalTeamsDir, "teams.yaml"), `
+legacy-global:
+  - scout
+`);
+
+    const result = getAllPredefinedTeams();
+
+    expect(result.find(t => t.name === "legacy-global")).toBeDefined();
+    expect(result.find(t => t.name === "legacy-global")?.agents).toEqual(["scout"]);
   });
 });
 
@@ -385,5 +438,74 @@ test-team:
   it("returns undefined for non-existent team", () => {
     const result = getPredefinedTeam("non-existent", projectDir);
     expect(result).toBeUndefined();
+  });
+});
+
+describe("saveTeamTemplate", () => {
+  const rootPiDir = path.join(os.homedir(), ".pi");
+  const globalAgentsDir = path.join(rootPiDir, "agent", "agents");
+  const globalTeamsPath = path.join(rootPiDir, "teams.yaml");
+  const projectDir = path.join(os.tmpdir(), "pi-teams-test-save-" + Date.now());
+
+  let originalGlobalTeams: string | null = null;
+  let originalAgentFiles = new Set<string>();
+
+  beforeEach(() => {
+    if (fs.existsSync(projectDir)) {
+      fs.rmSync(projectDir, { recursive: true });
+    }
+
+    if (fs.existsSync(globalTeamsPath)) {
+      originalGlobalTeams = fs.readFileSync(globalTeamsPath, "utf-8");
+    }
+    if (fs.existsSync(globalAgentsDir)) {
+      originalAgentFiles = new Set(fs.readdirSync(globalAgentsDir));
+    }
+  });
+
+  afterEach(() => {
+    if (fs.existsSync(projectDir)) {
+      fs.rmSync(projectDir, { recursive: true });
+    }
+
+    if (originalGlobalTeams === null) {
+      if (fs.existsSync(globalTeamsPath)) fs.rmSync(globalTeamsPath);
+    } else {
+      fs.mkdirSync(path.dirname(globalTeamsPath), { recursive: true });
+      fs.writeFileSync(globalTeamsPath, originalGlobalTeams);
+    }
+
+    if (fs.existsSync(globalAgentsDir)) {
+      for (const file of fs.readdirSync(globalAgentsDir)) {
+        if (!originalAgentFiles.has(file)) {
+          fs.rmSync(path.join(globalAgentsDir, file));
+        }
+      }
+    }
+  });
+
+  it("writes user-scoped teams to ~/.pi/teams.yaml and agents to ~/.pi/agent/agents", () => {
+    const result = saveTeamTemplate(
+      {
+        name: "audit-team",
+        members: [
+          {
+            name: "security-worker",
+            agentType: "teammate",
+            prompt: "Audit security issues",
+          },
+        ],
+      },
+      {
+        templateName: "audit-team",
+        scope: "user",
+      }
+    );
+
+    expect(result.teamsYamlPath).toBe(globalTeamsPath);
+    expect(result.agentsDir).toBe(globalAgentsDir);
+    expect(fs.existsSync(globalTeamsPath)).toBe(true);
+    expect(fs.readFileSync(globalTeamsPath, "utf-8")).toContain("audit-team:");
+    expect(fs.existsSync(path.join(globalAgentsDir, "security-worker.md"))).toBe(true);
   });
 });
