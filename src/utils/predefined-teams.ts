@@ -215,12 +215,18 @@ export function getAllPredefinedTeams(projectDir?: string): PredefinedTeam[] {
   const teams: PredefinedTeam[] = [];
   const seenNames = new Set<string>();
 
-  // Global teams
-  const globalDir = path.join(os.homedir(), ".pi", "agent");
-  for (const team of discoverTeams(globalDir)) {
-    if (!seenNames.has(team.name)) {
-      seenNames.add(team.name);
-      teams.push(team);
+  // Global teams: prefer the documented ~/.pi/teams.yaml location,
+  // but still fall back to the legacy ~/.pi/agent/teams.yaml path.
+  const globalDirs = [
+    path.join(os.homedir(), ".pi"),
+    path.join(os.homedir(), ".pi", "agent"),
+  ];
+  for (const globalDir of globalDirs) {
+    for (const team of discoverTeams(globalDir)) {
+      if (!seenNames.has(team.name)) {
+        seenNames.add(team.name);
+        teams.push(team);
+      }
     }
   }
 
@@ -395,12 +401,13 @@ export function saveTeamTemplate(
   options: SaveTeamTemplateOptions
 ): SaveTeamTemplateResult {
   // Determine output paths based on scope
-  const baseDir = options.scope === "project"
-    ? path.join(options.projectDir || process.cwd(), ".pi")
-    : path.join(os.homedir(), ".pi", "agent");
+  const agentsDir = options.scope === "project"
+    ? path.join(options.projectDir || process.cwd(), ".pi", "agents")
+    : path.join(os.homedir(), ".pi", "agent", "agents");
 
-  const agentsDir = path.join(baseDir, "agents");
-  const teamsYamlPath = path.join(baseDir, "teams.yaml");
+  const teamsYamlPath = options.scope === "project"
+    ? path.join(options.projectDir || process.cwd(), ".pi", "teams.yaml")
+    : path.join(os.homedir(), ".pi", "teams.yaml");
 
   // Ensure agents directory exists
   if (!fs.existsSync(agentsDir)) {
