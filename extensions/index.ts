@@ -276,7 +276,7 @@ export default function (pi: ExtensionAPI) {
       prompt: Type.String(),
       cwd: Type.String(),
       model: Type.Optional(Type.String()),
-      thinking: Type.Optional(StringEnum(["off", "minimal", "low", "medium", "high"])),
+      thinking: Type.Optional(StringEnum(["off", "minimal", "low", "medium", "high", "xhigh"])),
       plan_mode_required: Type.Optional(Type.Boolean({ default: false })),
       separate_window: Type.Optional(Type.Boolean({ default: false })),
     }),

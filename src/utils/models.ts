@@ -1,3 +1,7 @@
+export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
+
+export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
+
 export interface Member {
   agentId: string;
   name: string;
@@ -10,7 +14,7 @@ export interface Member {
   subscriptions: any[];
   prompt?: string;
   color?: string;
-  thinking?: "off" | "minimal" | "low" | "medium" | "high";
+  thinking?: ThinkingLevel;
   planModeRequired?: boolean;
   backendType?: string;
   isActive?: boolean;

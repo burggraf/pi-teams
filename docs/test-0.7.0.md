@@ -13,7 +13,7 @@ Test the new thinking parameter by spawning three teammates with different setti
 
 Prompt:
 "Spawn three teammates with different thinking levels:
-- 'DeepThinker' with 'high' thinking level. Tell them they are an expert at complex architectural analysis.
+- 'DeepThinker' with 'xhigh' thinking level. Tell them they are an expert at complex architectural analysis.
 - 'MediumBot' with 'medium' thinking level. Tell them they are a balanced worker.
 - 'FastWorker' with 'low' thinking level. Tell them they need to work quickly."
 
@@ -24,7 +24,7 @@ Prompt:
 Check that the thinking levels are correctly persisted in the team configuration.
 
 Prompt:
-"Read the config for the 'v070-test' team. Verify that DeepThinker has thinking level 'high', MediumBot has 'medium', and FastWorker has 'low'."
+"Read the config for the 'v070-test' team. Verify that DeepThinker has thinking level 'xhigh', MediumBot has 'medium', and FastWorker has 'low'."
 
 ---
 
@@ -70,10 +70,10 @@ Tell both to report their current thinking setting when they reply."
 
 ### 8. Verify All Thinking Levels Supported
 
-Check the team config again to ensure all five thinking levels are represented correctly.
+Check the team config again to ensure all six thinking levels are represented correctly.
 
 Prompt:
-"Read the team config again. Verify that DeepThinker shows 'high', MediumBot shows 'medium', FastWorker shows 'low', MinimalRunner shows 'minimal', and InstantRunner shows 'off'."
+"Spawn one more teammate named 'ReviewerMax' with 'high' thinking level using model 'google/gemini-2.0-flash'. Then read the team config again. Verify that DeepThinker shows 'xhigh', ReviewerMax shows 'high', MediumBot shows 'medium', FastWorker shows 'low', MinimalRunner shows 'minimal', and InstantRunner shows 'off'."
 
 ---
 

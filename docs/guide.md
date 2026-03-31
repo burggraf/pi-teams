@@ -106,7 +106,7 @@ After db-migrator completes, broadcast the schema change:
 Use different models for cost optimization:
 
 > **You:** "Create a team named 'mixed-speed' using 'gpt-4o'"
-> **You:** "Spawn a teammate named 'architect' using 'gpt-4o' with 'high' thinking level for design decisions"
+> **You:** "Spawn a teammate named 'architect' using 'gpt-4o' with 'xhigh' thinking level for design decisions"
 > **You:** "Spawn a teammate named 'implementer' using 'haiku' with 'low' thinking level for quick coding"
 > **You:** "Spawn a teammate named 'reviewer' using 'gpt-4o' with 'medium' thinking level for code reviews"
 
@@ -212,18 +212,20 @@ fi
 - **`low`** - Standard work: typical feature implementation, tests
 - **`medium`** - Complex work: architecture decisions, tricky bugs
 - **`high`** - Critical work: security reviews, major refactors, design specs
+- **`xhigh`** - Deepest available reasoning: architecture audits, thorny debugging, high-stakes review work
 
 ### 2. Team Composition
 
 Balanced teams typically include:
 - **1-2 high-thinking, high-model** agents for architecture and reviews
+- **Use `xhigh` sparingly** for the one teammate doing the hardest reasoning-heavy work
 - **2-3 low-thinking, fast-model** agents for implementation
 - **1 medium-thinking** agent for coordination
 
 Example:
 ```bash
 # Design/Review duo (expensive but thorough)
-spawn "architect" using "gpt-4o" with "high" thinking
+spawn "architect" using "gpt-4o" with "xhigh" thinking
 spawn "reviewer" using "gpt-4o" with "medium" thinking
 
 # Implementation trio (fast and cheap)

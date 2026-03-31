@@ -82,7 +82,7 @@ Launch a new agent into a terminal pane with a role and instructions.
 - `prompt` (required): Instructions for the teammate's role and initial task
 - `cwd` (required): Working directory for the teammate
 - `model` (optional): AI model for this teammate (overrides team default)
-- `thinking` (optional): Thinking level (`off`, `minimal`, `low`, `medium`, `high`)
+- `thinking` (optional): Thinking level (`off`, `minimal`, `low`, `medium`, `high`, `xhigh`)
 - `plan_mode_required` (optional): If `true`, teammate must submit plans for approval
 
 **Model Options**:
@@ -95,6 +95,7 @@ Launch a new agent into a terminal pane with a role and instructions.
 - `low`: Light reasoning for quick decisions
 - `medium`: Balanced reasoning (default)
 - `high`: Extended reasoning for complex problems
+- `xhigh`: Maximum available reasoning for the hardest tasks
 
 **Examples**:
 ```javascript
@@ -131,7 +132,7 @@ spawn_teammate({
   prompt: "Design the new feature architecture",
   cwd: "/path/to/project",
   model: "gpt-4o",
-  thinking: "high"
+  thinking: "xhigh"
 })
 ```
 
@@ -577,7 +578,7 @@ pi-teams respects the following environment variables:
 
 - `ZELLIJ`: Automatically detected when running inside Zellij. Enables Zellij pane management.
 - `TMUX`: Automatically detected when running inside tmux. Enables tmux pane management.
-- `PI_DEFAULT_THINKING_LEVEL`: Default thinking level for spawned teammates if not specified (`off`, `minimal`, `low`, `medium`, `high`).
+- `PI_DEFAULT_THINKING_LEVEL`: Default thinking level for spawned teammates if not specified (`off`, `minimal`, `low`, `medium`, `high`, `xhigh`).
 
 ---
 
