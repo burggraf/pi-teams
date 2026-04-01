@@ -62,12 +62,16 @@ describe("CmuxAdapter", () => {
       process.env.CMUX_SOCKET_PATH = "/tmp/cmux.sock";
     });
 
-    it("should spawn a new pane and return the surface ID", () => {
-      mockExecCommand.mockReturnValue({ 
-        stdout: "OK surface-42", 
-        stderr: "", 
-        status: 0 
-      });
+    it("should spawn via new-split + poll + respawn-pane and return the new surface", () => {
+      mockExecCommand
+        // 1. listSurfaceRefs (before snapshot) — realistic cmux output
+        .mockReturnValueOnce({ stdout: "* surface:1  Terminal  [selected]\n  surface:2  Terminal\n", stderr: "", status: 0 })
+        // 2. new-split right
+        .mockReturnValueOnce({ stdout: "OK", stderr: "", status: 0 })
+        // 3. listSurfaceRefs (poll — finds new surface:42)
+        .mockReturnValueOnce({ stdout: "* surface:1  Terminal  [selected]\n  surface:2  Terminal\n  surface:42  Terminal\n", stderr: "", status: 0 })
+        // 4. respawn-pane
+        .mockReturnValueOnce({ stdout: "OK", stderr: "", status: 0 });
 
       const result = adapter.spawn({
         name: "test-agent",
@@ -76,19 +80,25 @@ describe("CmuxAdapter", () => {
         env: { PI_AGENT_ID: "test-123" },
       });
 
-      expect(result).toBe("surface-42");
-      expect(mockExecCommand).toHaveBeenCalledWith(
-        "cmux",
-        ["new-split", "right", "--command", "env PI_AGENT_ID=test-123 pi --agent test"]
-      );
+      expect(result).toBe("surface:42");
+
+      // Verify new-split was called without --command
+      expect(mockExecCommand).toHaveBeenCalledWith("cmux", ["new-split", "right"]);
+
+      // Verify respawn-pane was called with the new surface and full command (with cd prefix)
+      expect(mockExecCommand).toHaveBeenCalledWith("cmux", [
+        "respawn-pane",
+        "--surface", "surface:42",
+        "--command", "cd '/home/user/project' && env PI_AGENT_ID=test-123 pi --agent test",
+      ]);
     });
 
     it("should spawn without env prefix when no PI_ vars", () => {
-      mockExecCommand.mockReturnValue({ 
-        stdout: "OK surface-99", 
-        stderr: "", 
-        status: 0 
-      });
+      mockExecCommand
+        .mockReturnValueOnce({ stdout: "  surface:1  Terminal\n", stderr: "", status: 0 })
+        .mockReturnValueOnce({ stdout: "OK", stderr: "", status: 0 })
+        .mockReturnValueOnce({ stdout: "  surface:1  Terminal\n  surface:99  Terminal\n", stderr: "", status: 0 })
+        .mockReturnValueOnce({ stdout: "OK", stderr: "", status: 0 });
 
       const result = adapter.spawn({
         name: "test-agent",
@@ -97,19 +107,20 @@ describe("CmuxAdapter", () => {
         env: { OTHER: "ignored" },
       });
 
-      expect(result).toBe("surface-99");
-      expect(mockExecCommand).toHaveBeenCalledWith(
-        "cmux",
-        ["new-split", "right", "--command", "pi"]
-      );
+      expect(result).toBe("surface:99");
+      expect(mockExecCommand).toHaveBeenCalledWith("cmux", [
+        "respawn-pane",
+        "--surface", "surface:99",
+        "--command", "cd '/home/user/project' && pi",
+      ]);
     });
 
-    it("should throw on spawn failure", () => {
-      mockExecCommand.mockReturnValue({ 
-        stdout: "", 
-        stderr: "cmux not found", 
-        status: 1 
-      });
+    it("should throw on new-split failure", () => {
+      mockExecCommand
+        // listSurfaceRefs (before)
+        .mockReturnValueOnce({ stdout: "  surface:1  Terminal\n", stderr: "", status: 0 })
+        // new-split fails
+        .mockReturnValueOnce({ stdout: "", stderr: "cmux not found", status: 1 });
 
       expect(() => adapter.spawn({
         name: "test-agent",
@@ -119,19 +130,43 @@ describe("CmuxAdapter", () => {
       })).toThrow("cmux new-split failed with status 1");
     });
 
-    it("should throw on unexpected output format", () => {
-      mockExecCommand.mockReturnValue({ 
-        stdout: "ERROR something went wrong", 
-        stderr: "", 
-        status: 0 
-      });
+    it("should throw when new surface is not found after polling", () => {
+      mockExecCommand
+        // listSurfaceRefs (before)
+        .mockReturnValueOnce({ stdout: "  surface:1  Terminal\n", stderr: "", status: 0 })
+        // new-split OK
+        .mockReturnValueOnce({ stdout: "OK", stderr: "", status: 0 });
+
+      // All subsequent polls return the same surfaces (no new one appears)
+      // Each poll cycle = listSurfaceRefs + sleep
+      for (let i = 0; i < 20; i++) {
+        mockExecCommand
+          .mockReturnValueOnce({ stdout: "  surface:1  Terminal\n", stderr: "", status: 0 })  // listSurfaceRefs
+          .mockReturnValueOnce({ stdout: "", stderr: "", status: 0 });  // sleep
+      }
 
       expect(() => adapter.spawn({
         name: "test-agent",
         cwd: "/home/user/project",
         command: "pi",
         env: {},
-      })).toThrow("cmux new-split returned unexpected output");
+      })).toThrow("new surface was not found");
+    });
+
+    it("should throw when respawn-pane fails", () => {
+      mockExecCommand
+        .mockReturnValueOnce({ stdout: "  surface:1  Terminal\n", stderr: "", status: 0 })
+        .mockReturnValueOnce({ stdout: "OK", stderr: "", status: 0 })
+        .mockReturnValueOnce({ stdout: "  surface:1  Terminal\n  surface:50  Terminal\n", stderr: "", status: 0 })
+        // respawn-pane fails
+        .mockReturnValueOnce({ stdout: "", stderr: "respawn error", status: 1 });
+
+      expect(() => adapter.spawn({
+        name: "test-agent",
+        cwd: "/home/user/project",
+        command: "pi",
+        env: {},
+      })).toThrow("cmux respawn-pane failed with status 1");
     });
   });
 
@@ -239,7 +274,7 @@ describe("CmuxAdapter", () => {
       );
       expect(mockExecCommand).toHaveBeenCalledWith(
         "cmux",
-        ["new-workspace", "--window", "window-1", "--command", "env PI_TEAM=myteam pi"]
+        ["new-workspace", "--window", "window-1", "--command", "cd '/home/user/project' && env PI_TEAM=myteam pi"]
       );
       expect(mockExecCommand).toHaveBeenCalledWith(
         "cmux",
