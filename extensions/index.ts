@@ -9,7 +9,9 @@ import * as runtime from "../src/utils/runtime";
 import { Member } from "../src/utils/models";
 import { getTerminalAdapter } from "../src/adapters/terminal-registry";
 import { Iterm2Adapter } from "../src/adapters/iterm2-adapter";
+import { CmuxAdapter } from "../src/adapters/cmux-adapter";
 import * as predefined from "../src/utils/predefined-teams";
+import * as worktrees from "../src/utils/worktrees";
 import * as path from "node:path";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -557,6 +559,7 @@ export default function (pi: ExtensionAPI) {
       thinking: Type.Optional(StringEnum(["off", "minimal", "low", "medium", "high"])),
       plan_mode_required: Type.Optional(Type.Boolean({ default: false })),
       separate_window: Type.Optional(Type.Boolean({ default: false })),
+      anchor_pane_id: Type.Optional(Type.String({ description: "Optional workspace or pane ID to spawn into (e.g. cmux workspace ref from create_worktree)" })),
     }),
     async execute(toolCallId, params: any, signal, onUpdate, ctx) {
       const safeName = paths.sanitizeName(params.name);
@@ -666,9 +669,9 @@ export default function (pi: ExtensionAPI) {
           }
 
           const leadMember = teamConfig.members.find(m => m.name === "team-lead");
-          const anchorPaneId = terminal.name === "tmux"
-            ? leadMember?.tmuxPaneId || process.env.TMUX_PANE || undefined
-            : undefined;
+          // Use explicit anchor if provided (e.g. cmux workspace ref), otherwise fall back to tmux lead pane
+          const anchorPaneId = params.anchor_pane_id
+            || (terminal.name === "tmux" ? leadMember?.tmuxPaneId || process.env.TMUX_PANE || undefined : undefined);
 
           terminalId = terminal.spawn({
             name: safeName,
@@ -1312,6 +1315,125 @@ You can now use this template with:
           savedAgents: result.savedAgents,
           templateExisted: result.templateExisted,
         },
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "create_worktree",
+    label: "Create Worktree",
+    description: "Create a git worktree for a branch, returning its path. Use this to give teammates isolated working directories. Multiple agents can share a worktree. Pass the returned path as `cwd` when spawning teammates. In cmux, this also creates a colored workspace — pass the returned `workspaceRef` as `anchor_pane_id` when spawning teammates to group them visually.",
+    parameters: Type.Object({
+      team_name: Type.String({ description: "Team name (for tracking)" }),
+      branch: Type.String({ description: "Branch name to create or checkout" }),
+      from_ref: Type.Optional(Type.String({ description: "Base ref to branch from (default: HEAD). E.g. 'main', 'origin/main'" })),
+      cwd: Type.Optional(Type.String({ description: "Working directory to detect git repo (default: current directory)" })),
+    }),
+    async execute(toolCallId, params: any, signal, onUpdate, ctx) {
+      const safeName = paths.sanitizeName(params.team_name);
+      if (!teams.teamExists(safeName)) {
+        throw new Error(`Team ${params.team_name} does not exist`);
+      }
+
+      const cwd = params.cwd || ctx.cwd;
+      const repoRoot = worktrees.getRepoRoot(cwd);
+      if (!repoRoot) {
+        throw new Error(`Not inside a git repository: ${cwd}`);
+      }
+
+      const result = worktrees.createWorktree(repoRoot, params.branch, params.from_ref);
+      if (!result.ok) {
+        throw new Error(result.error);
+      }
+
+      // If running in cmux, create a dedicated colored workspace for this worktree
+      let workspaceRef: string | undefined;
+      if (terminal instanceof CmuxAdapter) {
+        try {
+          workspaceRef = terminal.createWorkspace(params.branch, result.path);
+        } catch {
+          // Non-critical — agents can still spawn into the default workspace
+        }
+      }
+
+      const status = result.reused ? "reused existing" : "created new";
+      let message = `Worktree ${status} for branch '${params.branch}' at:\n${result.path}`;
+      if (workspaceRef) {
+        message += `\n\ncmux workspace created: ${workspaceRef}\nPass this as 'anchor_pane_id' when spawning teammates to group them in this workspace.`;
+      } else {
+        message += `\n\nUse this path as 'cwd' when spawning teammates.`;
+      }
+
+      return {
+        content: [{ type: "text", text: message }],
+        details: {
+          teamName: safeName,
+          branch: params.branch,
+          path: result.path,
+          reused: result.reused,
+          repoRoot,
+          workspaceRef,
+        },
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "list_worktrees",
+    label: "List Worktrees",
+    description: "List all git worktrees for the current repository.",
+    parameters: Type.Object({
+      cwd: Type.Optional(Type.String({ description: "Working directory to detect git repo (default: current directory)" })),
+    }),
+    async execute(toolCallId, params: any, signal, onUpdate, ctx) {
+      const cwd = params.cwd || ctx.cwd;
+      const repoRoot = worktrees.getRepoRoot(cwd);
+      if (!repoRoot) {
+        throw new Error(`Not inside a git repository: ${cwd}`);
+      }
+
+      const list = worktrees.listWorktrees(repoRoot);
+      if (list.length === 0) {
+        return {
+          content: [{ type: "text", text: "No worktrees found." }],
+          details: { repoRoot, worktrees: [] },
+        };
+      }
+
+      const summary = list.map(w =>
+        `- ${w.branch || "(detached)"}: ${w.path}`
+      ).join("\n");
+
+      return {
+        content: [{ type: "text", text: `Worktrees for ${repoRoot}:\n${summary}` }],
+        details: { repoRoot, worktrees: list },
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "remove_worktree",
+    label: "Remove Worktree",
+    description: "Remove a git worktree by path. Use during team cleanup to remove worktrees that are no longer needed.",
+    parameters: Type.Object({
+      worktree_path: Type.String({ description: "Path to the worktree to remove" }),
+      cwd: Type.Optional(Type.String({ description: "Working directory to detect git repo (default: current directory)" })),
+    }),
+    async execute(toolCallId, params: any, signal, onUpdate, ctx) {
+      const cwd = params.cwd || ctx.cwd;
+      const repoRoot = worktrees.getRepoRoot(cwd);
+      if (!repoRoot) {
+        throw new Error(`Not inside a git repository: ${cwd}`);
+      }
+
+      const result = worktrees.removeWorktree(repoRoot, params.worktree_path);
+      if (!result.ok) {
+        throw new Error(result.error!);
+      }
+
+      return {
+        content: [{ type: "text", text: `Worktree removed: ${params.worktree_path}` }],
+        details: { repoRoot, removedPath: params.worktree_path },
       };
     },
   });
