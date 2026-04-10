@@ -521,7 +521,7 @@ export default function (pi: ExtensionAPI) {
     parameters: Type.Object({
       team_name: Type.String(),
       description: Type.Optional(Type.String()),
-      default_model: Type.Optional(Type.String()),
+      default_model: Type.Optional(Type.String({ description: "Default model for teammates. IMPORTANT: Omit this parameter to use pi's configured default model. Only set this when the user explicitly requests a specific model." })),
       separate_windows: Type.Optional(Type.Boolean({ default: false, description: "Open teammates in separate OS windows instead of panes" })),
     }),
     async execute(toolCallId, params: any, signal, onUpdate, ctx) {
@@ -553,8 +553,9 @@ export default function (pi: ExtensionAPI) {
       name: Type.String(),
       prompt: Type.String(),
       cwd: Type.String(),
-      model: Type.Optional(Type.String()),
+      model: Type.Optional(Type.String({ description: "Model for this teammate. IMPORTANT: Omit this parameter to use pi's configured default model. Only set this when the user explicitly requests a specific model." })),
       thinking: Type.Optional(StringEnum(["off", "minimal", "low", "medium", "high", "xhigh"])),
+
       plan_mode_required: Type.Optional(Type.Boolean({ default: false })),
       separate_window: Type.Optional(Type.Boolean({ default: false })),
     }),
@@ -1102,7 +1103,7 @@ export default function (pi: ExtensionAPI) {
       team_name: Type.String({ description: "Name for the new team instance" }),
       predefined_team: Type.String({ description: "Name of the predefined team template from teams.yaml" }),
       cwd: Type.String({ description: "Working directory for spawned agents" }),
-      default_model: Type.Optional(Type.String({ description: "Default model for agents without a specified model" })),
+      default_model: Type.Optional(Type.String({ description: "Default model for agents without a specified model. IMPORTANT: Omit this parameter to use pi's configured default model. Only set this when the user explicitly requests a specific model." })),
       separate_windows: Type.Optional(Type.Boolean({ default: false, description: "Open teammates in separate OS windows instead of panes" })),
     }),
     async execute(toolCallId, params: any, signal, onUpdate, ctx) {
