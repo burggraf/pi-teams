@@ -21,17 +21,20 @@ pi install npm:pi-teams
 ## 🚀 Quick Start
 
 ```bash
-# 1. Start a team (inside tmux, Zellij, or iTerm2)
-"Create a team named 'my-team' using 'gpt-4o'"
+# 1. See available fully qualified models first
+"List available models for team creation"
 
-# 2. Spawn teammates
+# 2. Start a team (inside tmux, Zellij, or iTerm2)
+"Create a team named 'my-team' using 'openai-codex/gpt-5.4'"
+
+# 3. Spawn teammates
 "Spawn 'security-bot' to scan for vulnerabilities"
-"Spawn 'frontend-dev' using 'haiku' for quick iterations"
+"Spawn 'frontend-dev' using 'claude-agent-sdk/claude-sonnet-4-6' for quick iterations"
 
-# 3. Create and assign tasks
+# 4. Create and assign tasks
 "Create a task for security-bot: 'Audit auth endpoints'"
 
-# 4. Review and approve work
+# 5. Review and approve work
 "List all tasks and approve any pending plans"
 ```
 
@@ -57,17 +60,17 @@ pi install npm:pi-teams
 ## 💬 Key Examples
 
 ### 1. Start a Team
-> **You:** "Create a team named 'my-app-audit' for reviewing the codebase."
+> **You:** "List available models for team creation, then create a team named 'my-app-audit' using 'openai-codex/gpt-5.4' for reviewing the codebase."
 
 **Set a default model for the whole team:**
-> **You:** "Create a team named 'Research' and use 'gpt-4o' for everyone."
+> **You:** "List available models for team creation, then create a team named 'Research' using 'openai-codex/gpt-5.4' for everyone."
 
 **Start a team in "Separate Windows" mode:**
 > **You:** "Create a team named 'Dev' and open everyone in separate windows."
 *(Supported in iTerm2 and WezTerm only)*
 
 ### 2. Spawn Teammate with Custom Settings
-> **You:** "Spawn a teammate named 'security-bot' in the current folder. Tell them to scan for hardcoded API keys."
+> **You:** "Spawn a teammate named 'security-bot' using 'openai-codex/gpt-5.4' in the current folder. Tell them to scan for hardcoded API keys."
 
 **Spawn a specific teammate in a separate window:**
 > **You:** "Spawn 'researcher' in a separate window."
@@ -77,24 +80,36 @@ pi install npm:pi-teams
 *(Requires separate_windows mode enabled or iTerm2/WezTerm)*
 
 **Use a different model:**
-> **You:** "Spawn a teammate named 'speed-bot' using 'haiku' to quickly run some benchmarks."
+> **You:** "List available models for team creation, then spawn a teammate named 'speed-bot' using 'claude-agent-sdk/claude-sonnet-4-6' to quickly run some benchmarks."
 
 **Require plan approval:**
 > **You:** "Spawn a teammate named 'refactor-bot' and require plan approval before they make any changes."
 
 **Customize model and thinking level:**
-> **You:** "Spawn a teammate named 'architect-bot' using 'gpt-4o' with 'high' thinking level for deep reasoning."
+> **You:** "List available models for team creation, then spawn a teammate named 'architect-bot' using 'openai-codex/gpt-5.4' with 'high' thinking level for deep reasoning."
 
-**Smart Model Resolution:**
-When you specify a model name without a provider (e.g., `gemini-2.5-flash`), pi-teams automatically:
-- Queries available models from `pi --list-models`
-- Prioritizes **OAuth/subscription providers** (cheaper/free) over API-key providers:
-  - `google-gemini-cli` (OAuth) is preferred over `google` (API key)
-  - `github-copilot`, `kimi-sub` are preferred over their API-key equivalents
-- Falls back to API-key providers if OAuth providers aren't available
-- Constructs the correct `--model provider/model:thinking` command
+**Explicit model selection:**
+pi-teams does **not** auto-resolve bare model names like `gpt-5` or `haiku`.
+When creating a new team or spawning teammates, use `list_available_models` first and then pass a fully qualified `provider/model` string.
 
-> **Example:** Specifying `gemini-2.5-flash` will automatically use `google-gemini-cli/gemini-2.5-flash` if available, saving API costs.
+If you provide a model that is not fully qualified or not available, pi-teams will fail fast and ask you to choose a valid model.
+
+**Configuring model-list ordering:**
+You can customize the order shown by `list_available_models` globally with `~/.pi/pi-teams.json` or per-project with `.pi/pi-teams.json`.
+Project-local config overrides global config.
+
+```json
+{
+  "providerPriority": [
+    "openai-codex",
+    "claude-agent-sdk",
+    "kimi-coding"
+  ]
+}
+```
+
+- `providerPriority`: Controls the ordering shown by `list_available_models` after pi's preferred models are listed first.
+- Preferred models themselves come from pi settings (`defaultProvider`, `defaultModel`, and `enabledModels`).
 
 ### 3. Assign Task & Get Approval
 > **You:** "Create a task for security-bot: 'Check the .env.example file for sensitive defaults' and set it to in_progress."
@@ -172,7 +187,7 @@ You are a scout agent. Investigate the codebase quickly and report findings conc
 name: builder
 description: Implementation specialist
 tools: read,write,edit,bash
-model: claude-sonnet-4
+model: claude-agent-sdk/claude-sonnet-4-6
 thinking: medium
 ---
 You are a builder agent. Implement code following the plan provided. Write clean, tested code.
@@ -182,7 +197,7 @@ You are a builder agent. Implement code following the plan provided. Write clean
 - `name` (required): The agent's name
 - `description` (required): What the agent does
 - `tools` (optional): Comma or space-separated list of allowed tools
-- `model` (optional): Model to use (e.g., `claude-sonnet-4`, `gpt-4o`)
+- `model` (optional): Fully qualified model to use (e.g., `claude-agent-sdk/claude-sonnet-4-6`, `openai-codex/gpt-5.4`)
 - `thinking` (optional): Thinking level (`off`, `minimal`, `low`, `medium`, `high`)
 
 ### Use Predefined Teams
@@ -202,7 +217,7 @@ This single command:
 3. Each agent gets its predefined prompt, tools, model, and thinking settings
 
 **With options:**
-> **You:** "Create a team named 'big-team' from 'full' predefined team using 'gpt-4o' as default model and separate windows."
+> **You:** "Create a team named 'big-team' from 'full' predefined team using 'openai-codex/gpt-5.4' as default model and separate windows."
 
 ---
 

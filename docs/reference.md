@@ -19,6 +19,22 @@ Complete documentation of all tools, parameters, and automated behavior.
 
 ## Team Management
 
+### list_available_models
+
+List available fully qualified models for creating new teams and spawning new teammates.
+
+Use this tool before choosing a model. pi-teams expects fully qualified `provider/model` strings and rejects bare names like `gpt-5` or `haiku`.
+
+**Returns**:
+- Available models, already sorted with preferred models first
+- Preferred models derived from pi settings
+- Provider priority from pi-teams config (if configured)
+
+**Example**:
+```javascript
+list_available_models({})
+```
+
 ### team_create
 
 Start a new team with optional default model.
@@ -26,12 +42,12 @@ Start a new team with optional default model.
 **Parameters**:
 - `team_name` (required): Name for the team
 - `description` (optional): Team description
-- `default_model` (optional): Default AI model for all teammates (e.g., `gpt-4o`, `haiku`, `glm-4.7`)
+- `default_model` (optional): Fully qualified default AI model for all teammates (for example, `openai-codex/gpt-5.4`)
 
 **Examples**:
 ```javascript
 team_create({ team_name: "my-team" })
-team_create({ team_name: "research", default_model: "gpt-4o" })
+team_create({ team_name: "research", default_model: "openai-codex/gpt-5.4" })
 ```
 
 ---
@@ -81,13 +97,15 @@ Launch a new agent into a terminal pane with a role and instructions.
 - `name` (required): Friendly name for the teammate (e.g., "security-bot")
 - `prompt` (required): Instructions for the teammate's role and initial task
 - `cwd` (required): Working directory for the teammate
-- `model` (optional): AI model for this teammate (overrides team default)
+- `model` (optional): Fully qualified AI model for this teammate (overrides team default)
 - `thinking` (optional): Thinking level (`off`, `minimal`, `low`, `medium`, `high`, `xhigh`)
 - `plan_mode_required` (optional): If `true`, teammate must submit plans for approval
 
-**Model Options**:
-- Any model available in your pi configuration
-- Common models: `gpt-4o`, `haiku` (Anthropic), `glm-4.7`, `glm-5` (Zhipu AI)
+**Model Rules**:
+- Use `list_available_models` first when choosing a model for a new team or teammate
+- Models must be fully qualified `provider/model` strings
+- If `model` is omitted, the team must already have a fully qualified default model
+- Unknown or unqualified models fail fast
 
 **Thinking Levels**:
 - `off`: No thinking blocks (fastest)
@@ -113,7 +131,7 @@ spawn_teammate({
   name: "speed-bot",
   prompt: "Run benchmarks on the API endpoints",
   cwd: "/path/to/project",
-  model: "haiku"
+  model: "claude-agent-sdk/claude-sonnet-4-6"
 })
 
 // With plan approval
@@ -131,7 +149,7 @@ spawn_teammate({
   name: "architect-bot",
   prompt: "Design the new feature architecture",
   cwd: "/path/to/project",
-  model: "gpt-4o",
+  model: "openai-codex/gpt-5.4",
   thinking: "xhigh"
 })
 ```
@@ -520,17 +538,17 @@ All pi-teams data is stored in your home directory under `~/.pi/`:
 {
   "name": "my-team",
   "description": "Code review team",
-  "defaultModel": "gpt-4o",
+  "defaultModel": "openai-codex/gpt-5.4",
   "members": [
     {
       "name": "security-bot",
-      "model": "gpt-4o",
+      "model": "openai-codex/gpt-5.4",
       "thinking": "medium",
       "planModeRequired": true
     },
     {
       "name": "frontend-dev",
-      "model": "haiku",
+      "model": "claude-agent-sdk/claude-sonnet-4-6",
       "thinking": "low",
       "planModeRequired": false
     }
@@ -574,6 +592,31 @@ All pi-teams data is stored in your home directory under `~/.pi/`:
   ]
 }
 ```
+
+### Model Listing Configuration
+
+You can customize how `list_available_models` orders providers after preferred models are listed first.
+
+Supported config locations:
+- Global: `~/.pi/pi-teams.json`
+- Project-local: `.pi/pi-teams.json`
+
+Project-local config overrides global config.
+
+Example:
+
+```json
+{
+  "providerPriority": [
+    "openai-codex",
+    "claude-agent-sdk",
+    "kimi-coding"
+  ]
+}
+```
+
+Fields:
+- `providerPriority`: Ordered list used to sort the output from `list_available_models` after preferred models are listed first.
 
 ---
 

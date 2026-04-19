@@ -30,11 +30,11 @@ pi
 
 Create your first team:
 
-> **You:** "Create a team named 'my-team'"
+> **You:** "List available models for team creation, then create a team named 'my-team' using 'openai-codex/gpt-5.4'"
 
 Set a default model for all teammates:
 
-> **You:** "Create a team named 'Research' and use 'gpt-4o' for everyone"
+> **You:** "List available models for team creation, then create a team named 'Research' and use 'openai-codex/gpt-5.4' for everyone"
 
 ---
 
@@ -42,15 +42,16 @@ Set a default model for all teammates:
 
 ### 1. Code Review Team
 
-> **You:** "Create a team named 'code-review' using 'gpt-4o'"
+> **You:** "List available models for team creation"
+> **You:** "Create a team named 'code-review' using 'openai-codex/gpt-5.4'"
 > **You:** "Spawn a teammate named 'security-reviewer' to check for vulnerabilities"
-> **You:** "Spawn a teammate named 'performance-reviewer' using 'haiku' to check for optimization opportunities"
+> **You:** "Spawn a teammate named 'performance-reviewer' using 'claude-agent-sdk/claude-sonnet-4-6' to check for optimization opportunities"
 > **You:** "Create a task for security-reviewer: 'Review the auth module for SQL injection risks' and set it to in_progress"
 > **You:** "Create a task for performance-reviewer: 'Analyze the database queries for N+1 issues' and set it to in_progress"
 
 ### 2. Refactor with Plan Approval
 
-> **You:** "Create a team named 'refactor-squad'"
+> **You:** "Create a team named 'refactor-squad' using 'openai-codex/gpt-5.4'"
 > **You:** "Spawn a teammate named 'refactor-bot' and require plan approval before they make any changes"
 > **You:** "Create a task for refactor-bot: 'Refactor the user service to use dependency injection' and set it to in_progress"
 
@@ -83,7 +84,7 @@ npm run lint
 echo "All checks passed!"
 ```
 
-> **You:** "Create a team named 'test-team'"
+> **You:** "Create a team named 'test-team' using 'openai-codex/gpt-5.4'"
 > **You:** "Spawn a teammate named 'qa-bot' to write tests"
 > **You:** "Create a task for qa-bot: 'Write unit tests for the payment module' and set it to in_progress"
 
@@ -91,9 +92,9 @@ When qa-bot marks the task as completed, the hook automatically runs tests and l
 
 ### 4. Coordinated Migration
 
-> **You:** "Create a team named 'migration-team'"
+> **You:** "Create a team named 'migration-team' using 'openai-codex/gpt-5.4'"
 > **You:** "Spawn a teammate named 'db-migrator' to handle database changes"
-> **You:** "Spawn a teammate named 'api-updater' using 'gpt-4o' to update API endpoints"
+> **You:** "Spawn a teammate named 'api-updater' using 'openai-codex/gpt-5.4' to update API endpoints"
 > **You:** "Spawn a teammate named 'test-writer' to write tests for the migration"
 > **You:** "Create a task for db-migrator: 'Add new columns to the users table' and set it to in_progress"
 
@@ -105,10 +106,11 @@ After db-migrator completes, broadcast the schema change:
 
 Use different models for cost optimization:
 
-> **You:** "Create a team named 'mixed-speed' using 'gpt-4o'"
-> **You:** "Spawn a teammate named 'architect' using 'gpt-4o' with 'xhigh' thinking level for design decisions"
-> **You:** "Spawn a teammate named 'implementer' using 'haiku' with 'low' thinking level for quick coding"
-> **You:** "Spawn a teammate named 'reviewer' using 'gpt-4o' with 'medium' thinking level for code reviews"
+> **You:** "List available models for team creation"
+> **You:** "Create a team named 'mixed-speed' using 'openai-codex/gpt-5.4'"
+> **You:** "Spawn a teammate named 'architect' using 'openai-codex/gpt-5.4' with 'xhigh' thinking level for design decisions"
+> **You:** "Spawn a teammate named 'implementer' using 'claude-agent-sdk/claude-sonnet-4-6' with 'low' thinking level for quick coding"
+> **You:** "Spawn a teammate named 'reviewer' using 'openai-codex/gpt-5.4' with 'medium' thinking level for code reviews"
 
 Now you have expensive reasoning for design and reviews, but fast/cheap implementation.
 
@@ -225,13 +227,13 @@ Balanced teams typically include:
 Example:
 ```bash
 # Design/Review duo (expensive but thorough)
-spawn "architect" using "gpt-4o" with "xhigh" thinking
-spawn "reviewer" using "gpt-4o" with "medium" thinking
+spawn "architect" using "openai-codex/gpt-5.4" with "xhigh" thinking
+spawn "reviewer" using "openai-codex/gpt-5.4" with "medium" thinking
 
 # Implementation trio (fast and cheap)
-spawn "backend-dev" using "haiku" with "low" thinking
-spawn "frontend-dev" using "haiku" with "low" thinking
-spawn "test-writer" using "haiku" with "off" thinking
+spawn "backend-dev" using "claude-agent-sdk/claude-sonnet-4-6" with "low" thinking
+spawn "frontend-dev" using "claude-agent-sdk/claude-sonnet-4-6" with "low" thinking
+spawn "test-writer" using "claude-agent-sdk/claude-sonnet-4-6" with "off" thinking
 ```
 
 ### 3. Plan Approval for High-Risk Changes
@@ -322,13 +324,34 @@ pi  # Then try to use tmux commands
 
 **Problem**: "Model not found" or similar errors.
 
-**Solution**: Check the model name is correct and available in your pi config. Some model names vary between providers:
+**Solution**: Use `list_available_models` first and then pass a fully qualified `provider/model` string.
 
-- `gpt-4o` - OpenAI
-- `haiku` - Anthropic (usually `claude-3-5-haiku`)
-- `glm-4.7` - Zhipu AI
+Examples:
+- `openai-codex/gpt-5.4`
+- `claude-agent-sdk/claude-sonnet-4-6`
+- `kimi-coding/kimi-for-coding`
 
-Check your pi config for available models.
+pi-teams does not auto-resolve bare model names like `gpt-5` or `haiku` when creating new teams or spawning new teammates.
+If a model is not fully qualified or not available, pi-teams fails fast.
+
+If you want to control the order shown by `list_available_models`, add global or project-local pi-teams config:
+
+- Global: `~/.pi/pi-teams.json`
+- Project-local: `.pi/pi-teams.json`
+
+Example:
+
+```json
+{
+  "providerPriority": [
+    "openai-codex",
+    "claude-agent-sdk",
+    "kimi-coding"
+  ]
+}
+```
+
+Preferred models are still taken from pi settings (`defaultProvider`, `defaultModel`, and `enabledModels`) and are listed first.
 
 ### Data Location
 
