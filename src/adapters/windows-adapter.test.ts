@@ -56,7 +56,8 @@ describe("WindowsAdapter", () => {
   describe("detect()", () => {
     it("should detect when on Windows and wt is available", () => {
       Object.defineProperty(process, "platform", { value: "win32" });
-      mockExecCommand.mockReturnValue({ stdout: "Windows Terminal", status: 0 });
+      // findWtBinary uses where.exe, not wt --help
+      mockExecCommand.mockReturnValue({ stdout: "C:\\path\\wt.exe", status: 0 });
 
       expect(adapter.detect()).toBe(true);
     });
@@ -90,14 +91,12 @@ describe("WindowsAdapter", () => {
   });
 
   describe("spawn()", () => {
-    it("should spawn first pane on Windows", () => {
+    it("should spawn a pane with vertical split and 50% size", () => {
       Object.defineProperty(process, "platform", { value: "win32" });
-      // Mock findWtBinary check
-      mockExecCommand.mockReturnValueOnce({ stdout: "wt", status: 0 });
+      // Mock findWtBinary (where.exe check)
+      mockExecCommand.mockReturnValueOnce({ stdout: "C:\\path\\wt.exe", status: 0 });
       // Mock findPsBinary check (pwsh found)
       mockExecCommand.mockReturnValueOnce({ stdout: "found", status: 0 });
-      // Mock getPanes - no existing panes
-      mockExecCommand.mockReturnValueOnce({ stdout: "[]", status: 0 });
       // Mock actual spawn
       mockExecCommand.mockReturnValueOnce({ stdout: "", status: 0 });
 
@@ -110,33 +109,25 @@ describe("WindowsAdapter", () => {
 
       // Returns synthetic ID: windows_<timestamp>_<name>
       expect(paneId).toMatch(/^windows_\d+_test-agent$/);
-    });
 
-    it("should spawn subsequent pane on Windows", () => {
-      Object.defineProperty(process, "platform", { value: "win32" });
-      // Mock findWtBinary check
-      mockExecCommand.mockReturnValueOnce({ stdout: "wt", status: 0 });
-      // Mock findPsBinary check (pwsh found)
-      mockExecCommand.mockReturnValueOnce({ stdout: "found", status: 0 });
-      // Mock getPanes - existing panes
-      mockExecCommand.mockReturnValueOnce({ stdout: '[{"window":1}]', status: 0 });
-      // Mock actual spawn
-      mockExecCommand.mockReturnValueOnce({ stdout: "", status: 0 });
-
-      const paneId = adapter.spawn({
-        name: "test-agent-2",
-        cwd: "/test/path",
-        command: "pi --model gpt-4",
-        env: { PI_TEAM_NAME: "team1", PI_AGENT_NAME: "agent1" },
-      });
-
-      // Returns synthetic ID: windows_<timestamp>_<name>
-      expect(paneId).toMatch(/^windows_\d+_test-agent-2$/);
+      // Verify the spawn call uses -V (vertical), --size 0.5, and -File (temp script)
+      const lastCall = mockExecCommand.mock.calls[mockExecCommand.mock.calls.length - 1];
+      expect(lastCall[0]).toBe("wt");
+      const args = lastCall[1] as string[];
+      expect(args).toContain("split-pane");
+      expect(args).toContain("-V");
+      // Should use --size 0.5 (decimal), NOT -% 50 or "50%"
+      const sizeIdx = args.indexOf("--size");
+      expect(sizeIdx).toBeGreaterThanOrEqual(0);
+      expect(args[sizeIdx + 1]).toBe("0.5");
+      // Should use -File (temp .ps1 script), NOT -Command (avoids quoting issues)
+      expect(args).toContain("-File");
+      expect(args).not.toContain("-Command");
     });
 
     it("should throw error when wt binary not found", () => {
-      Object.defineProperty(process, "platform", { value: "win32" });
-      // Mock findWtBinary - not found
+      Object.defineProperty(process, "platform", { value: "linux" });
+      // Mock findWtBinary - not found (where.exe fails + not win32 platform)
       mockExecCommand.mockReturnValue({ stdout: "", status: 1 });
 
       expect(() =>
@@ -148,17 +139,44 @@ describe("WindowsAdapter", () => {
         })
       ).toThrow();
     });
+
+    it("should not call wt list or wt --help (avoids visible error windows)", () => {
+      Object.defineProperty(process, "platform", { value: "win32" });
+      // Mock findWtBinary (where.exe check)
+      mockExecCommand.mockReturnValueOnce({ stdout: "C:\\path\\wt.exe", status: 0 });
+      // Mock findPsBinary check (pwsh found)
+      mockExecCommand.mockReturnValueOnce({ stdout: "found", status: 0 });
+      // Mock actual spawn
+      mockExecCommand.mockReturnValueOnce({ stdout: "", status: 0 });
+
+      adapter.spawn({
+        name: "test-agent",
+        cwd: "/test/path",
+        command: "pi",
+        env: {},
+      });
+
+      // Verify no call was made with "list" or "--help" as arguments to wt
+      for (const call of mockExecCommand.mock.calls) {
+        if (call[0] === "wt") {
+          const args = call[1] as string[];
+          expect(args).not.toContain("list");
+          expect(args).not.toContain("--help");
+          expect(args).not.toContain("--version");
+        }
+      }
+    });
   });
 
   describe("supportsWindows()", () => {
     it("should return true when wt is available", () => {
       Object.defineProperty(process, "platform", { value: "win32" });
-      mockExecCommand.mockReturnValue({ stdout: "wt found", status: 0 });
+      mockExecCommand.mockReturnValue({ stdout: "C:\\path\\wt.exe", status: 0 });
 
       expect(adapter.supportsWindows()).toBe(true);
     });
 
-    it("should return true on Windows even if wt check fails (fallback)", () => {
+    it("should return true on Windows even if where.exe fails (fallback)", () => {
       Object.defineProperty(process, "platform", { value: "win32" });
       // The Windows adapter has a fallback that assumes wt exists on Windows
       mockExecCommand.mockReturnValue({ stdout: "", status: 1 });
@@ -171,8 +189,8 @@ describe("WindowsAdapter", () => {
   describe("spawnWindow()", () => {
     it("should spawn a new window", () => {
       Object.defineProperty(process, "platform", { value: "win32" });
-      // Mock findWtBinary check
-      mockExecCommand.mockReturnValueOnce({ stdout: "wt", status: 0 });
+      // Mock findWtBinary (where.exe check)
+      mockExecCommand.mockReturnValueOnce({ stdout: "C:\\path\\wt.exe", status: 0 });
       // Mock findPsBinary check (pwsh found)
       mockExecCommand.mockReturnValueOnce({ stdout: "found", status: 0 });
       // Mock actual spawn
@@ -192,8 +210,8 @@ describe("WindowsAdapter", () => {
 
     it("should fallback to powershell when pwsh is not available", () => {
       Object.defineProperty(process, "platform", { value: "win32" });
-      // Mock findWtBinary check
-      mockExecCommand.mockReturnValueOnce({ stdout: "wt", status: 0 });
+      // Mock findWtBinary (where.exe check)
+      mockExecCommand.mockReturnValueOnce({ stdout: "C:\\path\\wt.exe", status: 0 });
       // Mock findPsBinary check - pwsh fails, powershell succeeds
       mockExecCommand.mockReturnValueOnce({ stdout: "", status: 1 }); // pwsh not found
       mockExecCommand.mockReturnValueOnce({ stdout: "found", status: 0 }); // powershell found
@@ -213,6 +231,29 @@ describe("WindowsAdapter", () => {
       expect(lastCall[0]).toBe("wt");
       // The command should use 'powershell' not 'pwsh'
       expect(lastCall[1]).toContain("powershell");
+    });
+
+    it("should format window title as teamName: name when teamName is provided", () => {
+      Object.defineProperty(process, "platform", { value: "win32" });
+      // Mock findWtBinary (where.exe check)
+      mockExecCommand.mockReturnValueOnce({ stdout: "C:\\path\\wt.exe", status: 0 });
+      // Mock findPsBinary check (pwsh found)
+      mockExecCommand.mockReturnValueOnce({ stdout: "found", status: 0 });
+      // Mock actual spawn
+      mockExecCommand.mockReturnValueOnce({ stdout: "", status: 0 });
+
+      adapter.spawnWindow({
+        name: "agent-1",
+        cwd: "/test/path",
+        command: "pi",
+        env: {},
+        teamName: "myteam",
+      });
+
+      const lastCall = mockExecCommand.mock.calls[mockExecCommand.mock.calls.length - 1];
+      const args = lastCall[1] as string[];
+      const titleIdx = args.indexOf("--title");
+      expect(args[titleIdx + 1]).toBe("myteam: agent-1");
     });
   });
 
@@ -259,7 +300,7 @@ describe("WindowsAdapter", () => {
   describe("setTitle()", () => {
     it("should set tab title gracefully", () => {
       Object.defineProperty(process, "platform", { value: "win32" });
-      mockExecCommand.mockReturnValue({ stdout: "", status: 0 });
+      mockExecCommand.mockReturnValue({ stdout: "C:\\path\\wt.exe", status: 0 });
 
       // Should not throw
       adapter.setTitle("windows_123_test", "New Title");
