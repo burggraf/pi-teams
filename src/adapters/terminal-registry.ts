@@ -7,6 +7,7 @@
 
 import { TerminalAdapter } from "../utils/terminal-adapter";
 import { TmuxAdapter } from "./tmux-adapter";
+import { HerdrAdapter } from "./herdr-adapter";
 import { ZellijAdapter } from "./zellij-adapter";
 import { CmuxAdapter } from "./cmux-adapter";
 import { Iterm2Adapter } from "./iterm2-adapter";
@@ -18,14 +19,16 @@ import { WindowsAdapter } from "./windows-adapter";
  *
  * Detection order (first match wins):
  * 1. tmux - if TMUX env is set
- * 2. Zellij - if ZELLIJ env is set and not in tmux
- * 3. cmux - if CMUX_SOCKET_PATH or CMUX_WORKSPACE_ID env is set
- * 4. iTerm2 - if TERM_PROGRAM=iTerm.app and not in tmux/zellij/cmux
- * 5. WezTerm - if WEZTERM_PANE env is set and not in tmux/zellij/cmux
- * 6. Windows - if platform is win32 and not in tmux/zellij/cmux/iTerm2/WezTerm
+ * 2. herdr - if HERDR_ENV=1 and HERDR_PANE_ID are set
+ * 3. Zellij - if ZELLIJ env is set and not in tmux
+ * 4. cmux - if CMUX_SOCKET_PATH or CMUX_WORKSPACE_ID env is set
+ * 5. iTerm2 - if TERM_PROGRAM=iTerm.app and not in tmux/zellij/cmux/herdr
+ * 6. WezTerm - if WEZTERM_PANE env is set and not in tmux/zellij/cmux/herdr
+ * 7. Windows - if platform is win32 and not in tmux/zellij/cmux/iTerm2/WezTerm/herdr
  */
 const adapters: TerminalAdapter[] = [
   new TmuxAdapter(),
+  new HerdrAdapter(),
   new ZellijAdapter(),
   new CmuxAdapter(),
   new Iterm2Adapter(),
