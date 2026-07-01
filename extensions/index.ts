@@ -634,6 +634,13 @@ export default function (pi: ExtensionAPI) {
         piCmd = `${piBinary} --thinking ${params.thinking}`;
       }
 
+      // Apply tool restrictions from agent definition (.md frontmatter)
+      const agents = predefined.getAllAgentDefinitions(ctx.cwd);
+      const agentDef = agents.find(a => a.name === safeName);
+      if (agentDef?.tools && agentDef.tools.length > 0) {
+        piCmd = `${piCmd} --tools ${agentDef.tools.join(",")}`;
+      }
+
       const env: Record<string, string> = {
         ...process.env,
         PI_TEAM_NAME: safeTeamName,
@@ -1186,6 +1193,10 @@ export default function (pi: ExtensionAPI) {
             }
           } else if (agentDef.thinking) {
             piCmd = `${piBinary} --thinking ${agentDef.thinking}`;
+          }
+
+          if (agentDef.tools && agentDef.tools.length > 0) {
+            piCmd = `${piCmd} --tools ${agentDef.tools.join(",")}`;
           }
 
           const env: Record<string, string> = {
