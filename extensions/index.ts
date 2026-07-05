@@ -522,7 +522,7 @@ export default function (pi: ExtensionAPI) {
       team_name: Type.String(),
       description: Type.Optional(Type.String()),
       default_model: Type.Optional(Type.String()),
-      separate_windows: Type.Optional(Type.Boolean({ default: false, description: "Open teammates in separate OS windows instead of panes" })),
+      separate_windows: Type.Optional(Type.Boolean({ default: false, description: "Open teammates in separate window/tab surfaces instead of panes" })),
     }),
     async execute(toolCallId, params: any, signal, onUpdate, ctx) {
       // Auto-cleanup stale team if the previous lead process is dead
@@ -547,7 +547,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "spawn_teammate",
     label: "Spawn Teammate",
-    description: "Spawn a new teammate in a terminal pane or separate window.",
+    description: "Spawn a new teammate in a terminal pane or separate window/tab surface.",
     parameters: Type.Object({
       team_name: Type.String(),
       name: Type.String(),
@@ -599,7 +599,7 @@ export default function (pi: ExtensionAPI) {
 
       const useSeparateWindow = params.separate_window ?? teamConfig.separateWindows ?? false;
       if (useSeparateWindow && !terminal.supportsWindows()) {
-        throw new Error(`Separate windows mode is not supported in ${terminal.name}.`);
+        throw new Error(`Separate window/tab surface mode is not supported in ${terminal.name}.`);
       }
 
       const member: Member = {
@@ -680,11 +680,11 @@ export default function (pi: ExtensionAPI) {
           await teams.updateMember(safeTeamName, safeName, { tmuxPaneId: terminalId });
         }
       } catch (e) {
-        throw new Error(`Failed to spawn ${terminal.name} ${isWindow ? 'window' : 'pane'}: ${e}`);
+        throw new Error(`Failed to spawn ${terminal.name} ${isWindow ? 'separate surface' : 'pane'}: ${e}`);
       }
 
       return {
-        content: [{ type: "text", text: `Teammate ${params.name} spawned in ${isWindow ? 'window' : 'pane'} ${terminalId}.` }],
+        content: [{ type: "text", text: `Teammate ${params.name} spawned in ${isWindow ? 'separate surface' : 'pane'} ${terminalId}.` }],
         details: { agentId: member.agentId, terminalId, isWindow },
       };
     },
@@ -693,7 +693,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "spawn_lead_window",
     label: "Spawn Lead Window",
-    description: "Open the team lead in a separate OS window.",
+    description: "Open the team lead in a separate window/tab surface.",
     parameters: Type.Object({
       team_name: Type.String(),
       cwd: Type.Optional(Type.String()),
@@ -701,7 +701,7 @@ export default function (pi: ExtensionAPI) {
     async execute(toolCallId, params: any, signal, onUpdate, ctx) {
       const safeTeamName = paths.sanitizeName(params.team_name);
       if (!teams.teamExists(safeTeamName)) throw new Error(`Team ${params.team_name} does not exist`);
-      if (!terminal || !terminal.supportsWindows()) throw new Error("Windows mode not supported.");
+      if (!terminal || !terminal.supportsWindows()) throw new Error("Separate window/tab surface mode not supported.");
 
       const teamConfig = await teams.readConfig(safeTeamName);
       const cwd = params.cwd || process.cwd();
@@ -716,7 +716,7 @@ export default function (pi: ExtensionAPI) {
       try {
         const windowId = terminal.spawnWindow({ name: "team-lead", cwd, command: piCmd, env, teamName: safeTeamName });
         await teams.updateMember(safeTeamName, "team-lead", { windowId });
-        return { content: [{ type: "text", text: `Lead window spawned: ${windowId}` }], details: { windowId } };
+        return { content: [{ type: "text", text: `Lead separate surface spawned: ${windowId}` }], details: { windowId } };
       } catch (e) {
         throw new Error(`Failed: ${e}`);
       }
@@ -1103,7 +1103,7 @@ export default function (pi: ExtensionAPI) {
       predefined_team: Type.String({ description: "Name of the predefined team template from teams.yaml" }),
       cwd: Type.String({ description: "Working directory for spawned agents" }),
       default_model: Type.Optional(Type.String({ description: "Default model for agents without a specified model" })),
-      separate_windows: Type.Optional(Type.Boolean({ default: false, description: "Open teammates in separate OS windows instead of panes" })),
+      separate_windows: Type.Optional(Type.Boolean({ default: false, description: "Open teammates in separate window/tab surfaces instead of panes" })),
     }),
     async execute(toolCallId, params: any, signal, onUpdate, ctx) {
       const projectDir = ctx.cwd;
@@ -1155,7 +1155,7 @@ export default function (pi: ExtensionAPI) {
 
           const useSeparateWindow = params.separate_windows ?? config.separateWindows ?? false;
           if (useSeparateWindow && !terminal.supportsWindows()) {
-            throw new Error(`Separate windows mode is not supported in ${terminal.name}.`);
+            throw new Error(`Separate window/tab surface mode is not supported in ${terminal.name}.`);
           }
 
           const member: Member = {
