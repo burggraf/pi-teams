@@ -76,45 +76,46 @@ export interface TerminalAdapter {
   setTitle(title: string): void;
 
   /**
-   * Check if this terminal supports spawning separate OS windows.
-   * Terminals like tmux and Zellij only support panes/tabs within a session.
+   * Check if this terminal supports spawning separate surfaces.
+   * Some adapters create true OS windows; others, such as Herdr, create
+   * terminal-native isolated surfaces such as tabs.
    * 
    * @returns true if spawnWindow() is supported
    */
   supportsWindows(): boolean;
 
   /**
-   * Spawn a new separate OS window with the given options.
+   * Spawn a new separate surface with the given options.
    * Only available if supportsWindows() returns true.
    * 
    * @param options - Spawn configuration
-   * @returns Window ID that can be used for subsequent operations
+   * @returns Surface ID that can be used for subsequent operations
    * @throws Error if spawn fails or not supported
    */
   spawnWindow(options: SpawnOptions): string;
 
   /**
-   * Set the title of a specific window.
-   * Used for identifying windows in the OS window manager.
+   * Set the title of a specific separate surface.
+   * Used for identifying windows/tabs in the terminal UI.
    * 
-   * @param windowId - The window ID returned from spawnWindow()
+   * @param windowId - The surface ID returned from spawnWindow()
    * @param title - The title to set
    */
   setWindowTitle(windowId: string, title: string): void;
 
   /**
-   * Kill/terminate a window.
-   * Should be idempotent - no error if window doesn't exist.
+   * Kill/terminate a separate surface.
+   * Should be idempotent - no error if the surface doesn't exist.
    * 
-   * @param windowId - The window ID returned from spawnWindow()
+   * @param windowId - The surface ID returned from spawnWindow()
    */
   killWindow(windowId: string): void;
 
   /**
-   * Check if a window is still alive/active.
+   * Check if a separate surface is still alive/active.
    * 
-   * @param windowId - The window ID returned from spawnWindow()
-   * @returns true if window exists and is active
+   * @param windowId - The surface ID returned from spawnWindow()
+   * @returns true if surface exists and is active
    */
   isWindowAlive(windowId: string): boolean;
 }

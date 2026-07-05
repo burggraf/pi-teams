@@ -1,6 +1,6 @@
 # pi-teams 🚀
 
-**pi-teams** turns your single Pi agent into a coordinated software engineering team. It allows you to spawn multiple "Teammate" agents in separate terminal panes that work autonomously, communicate with each other, and manage a shared task board—all mediated through tmux, Zellij, iTerm2, WezTerm, or Windows Terminal.
+**pi-teams** turns your single Pi agent into a coordinated software engineering team. It allows you to spawn multiple "Teammate" agents in separate terminal panes that work autonomously, communicate with each other, and manage a shared task board—all mediated through Herdr, tmux, Zellij, iTerm2, WezTerm, or Windows Terminal.
 
 ### 🖥️ pi-teams in Action
 
@@ -8,7 +8,7 @@
 | :---: | :---: | :---: |
 | <a href="iTerm2.png"><img src="iTerm2.png" width="300" alt="pi-teams in iTerm2"></a> | <a href="tmux.png"><img src="tmux.png" width="300" alt="pi-teams in tmux"></a> | <a href="zellij.png"><img src="zellij.png" width="300" alt="pi-teams in Zellij"></a> |
 
-*Also works with **WezTerm** and **Windows Terminal** (cross-platform support)*
+*Also works with **Herdr**, **WezTerm**, and **Windows Terminal** (cross-platform support)*
 
 ## 🛠 Installation
 
@@ -21,7 +21,7 @@ pi install npm:pi-teams
 ## 🚀 Quick Start
 
 ```bash
-# 1. Start a team (inside tmux, Zellij, or iTerm2)
+# 1. Start a team (inside Herdr, tmux, Zellij, or iTerm2)
 "Create a team named 'my-team' using 'gpt-4o'"
 
 # 2. Spawn teammates
@@ -47,8 +47,8 @@ pi install npm:pi-teams
 ### Advanced Features
 - **Predefined Teams**: Define team templates in `teams.yaml` and spawn entire teams with a single command.
 - **Save Teams as Templates**: Convert any runtime team into a reusable template with a single command.
-- **Isolated OS Windows**: Launch teammates in true separate OS windows instead of panes.
-- **Persistent Window Titles**: Windows are automatically titled `[team-name]: [agent-name]` for easy identification in your window manager.
+- **Isolated Surfaces**: Launch teammates in separate Herdr tabs or true OS windows instead of panes.
+- **Persistent Titles**: Separate surfaces are automatically titled `[team-name]: [agent-name]` for easy identification.
 - **Plan Approval Mode**: Require teammates to submit their implementation plans for your approval before they touch any code.
 - **Broadcast Messaging**: Send a message to the entire team at once for global coordination and announcements.
 - **Quality Gate Hooks**: Automated shell scripts run when tasks are completed (e.g., to run tests or linting).
@@ -62,19 +62,19 @@ pi install npm:pi-teams
 **Set a default model for the whole team:**
 > **You:** "Create a team named 'Research' and use 'gpt-4o' for everyone."
 
-**Start a team in "Separate Windows" mode:**
+**Start a team in separate window/tab mode:**
 > **You:** "Create a team named 'Dev' and open everyone in separate windows."
-*(Supported in iTerm2 and WezTerm only)*
+*(Supported in Herdr as new tabs, and in iTerm2/WezTerm/Windows Terminal as separate OS windows)*
 
 ### 2. Spawn Teammate with Custom Settings
 > **You:** "Spawn a teammate named 'security-bot' in the current folder. Tell them to scan for hardcoded API keys."
 
-**Spawn a specific teammate in a separate window:**
+**Spawn a specific teammate in a separate window/tab surface:**
 > **You:** "Spawn 'researcher' in a separate window."
 
-**Move the Team Lead to a separate window:**
+**Move the Team Lead to a separate window/tab surface:**
 > **You:** "Open the team lead in its own window."
-*(Requires separate_windows mode enabled or iTerm2/WezTerm)*
+*(Requires Herdr, iTerm2, WezTerm, or Windows Terminal)*
 
 **Use a different model:**
 > **You:** "Spawn a teammate named 'speed-bot' using 'haiku' to quickly run some benchmarks."
@@ -258,9 +258,13 @@ Once saved, use it just like any predefined team:
 
 ## 🪟 Terminal Requirements
 
-To show multiple agents on one screen, **pi-teams** requires a way to manage terminal panes. It supports **tmux**, **Zellij**, **iTerm2**, **WezTerm**, and **Windows Terminal**.
+To show multiple agents on one screen, **pi-teams** requires a way to manage terminal panes. It supports **Herdr**, **tmux**, **Zellij**, **iTerm2**, **WezTerm**, and **Windows Terminal**.
 
-### Option 1: tmux (Recommended)
+### Option 1: Herdr
+
+Simply start `pi` inside a Herdr pane. **pi-teams** will detect the `HERDR_ENV`, `HERDR_PANE_ID`, and `HERDR_SOCKET_PATH` environment variables and use `herdr agent start` to spawn teammates in Herdr-managed panes. Separate-window mode maps to new Herdr tabs.
+
+### Option 2: tmux (Recommended)
 
 Install tmux:
 - **macOS**: `brew install tmux`
@@ -272,11 +276,11 @@ tmux  # Start tmux session
 pi   # Start pi inside tmux
 ```
 
-### Option 2: Zellij
+### Option 3: Zellij
 
 Simply start `pi` inside a Zellij session. **pi-teams** will detect it via the `ZELLIJ` environment variable and use `zellij run` to spawn teammates in new panes.
 
-### Option 3: iTerm2 (macOS)
+### Option 4: iTerm2 (macOS)
 
 If you are using **iTerm2** on macOS and are *not* inside tmux or Zellij, **pi-teams** can manage your team in two ways:
 1. **Panes (Default)**: Automatically split your current window into an optimized layout.
@@ -284,7 +288,7 @@ If you are using **iTerm2** on macOS and are *not* inside tmux or Zellij, **pi-t
 
 It will name the panes or windows with the teammate's agent name for easy identification.
 
-### Option 4: WezTerm (macOS, Linux, Windows)
+### Option 5: WezTerm (macOS, Linux, Windows)
 
 **WezTerm** is a GPU-accelerated, cross-platform terminal emulator written in Rust. Like iTerm2, it supports both **Panes** and **Separate OS Windows**.
 
@@ -299,7 +303,7 @@ wezterm  # Start WezTerm
 pi       # Start pi inside WezTerm
 ```
 
-### Option 5: Windows Terminal (Windows)
+### Option 6: Windows Terminal (Windows)
 
 **Windows Terminal** is the modern, feature-rich terminal emulator for Windows 10/11. It supports both **Panes** and **Separate OS Windows**.
 

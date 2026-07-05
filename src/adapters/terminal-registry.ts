@@ -6,6 +6,7 @@
  */
 
 import { TerminalAdapter } from "../utils/terminal-adapter";
+import { HerdrAdapter } from "./herdr-adapter";
 import { TmuxAdapter } from "./tmux-adapter";
 import { ZellijAdapter } from "./zellij-adapter";
 import { CmuxAdapter } from "./cmux-adapter";
@@ -17,14 +18,18 @@ import { WindowsAdapter } from "./windows-adapter";
  * Available terminal adapters, ordered by priority
  *
  * Detection order (first match wins):
- * 1. tmux - if TMUX env is set
- * 2. Zellij - if ZELLIJ env is set and not in tmux
- * 3. cmux - if CMUX_SOCKET_PATH or CMUX_WORKSPACE_ID env is set
- * 4. iTerm2 - if TERM_PROGRAM=iTerm.app and not in tmux/zellij/cmux
- * 5. WezTerm - if WEZTERM_PANE env is set and not in tmux/zellij/cmux
- * 6. Windows - if platform is win32 and not in tmux/zellij/cmux/iTerm2/WezTerm
+ * 1. Herdr - if HERDR_ENV/HERDR_PANE_ID/HERDR_SOCKET_PATH are set
+ * 2. tmux - if TMUX env is set
+ * 3. Zellij - if ZELLIJ env is set and not in tmux
+ * 4. cmux - if CMUX_SOCKET_PATH or CMUX_WORKSPACE_ID env is set
+ * 5. iTerm2 - if TERM_PROGRAM=iTerm.app and not in tmux/zellij/cmux
+ * 6. WezTerm - if WEZTERM_PANE env is set and not in tmux/zellij/cmux
+ * 7. Windows - if platform is win32 and not in tmux/zellij/cmux/iTerm2/WezTerm
  */
 const adapters: TerminalAdapter[] = [
+  // Prefer Herdr when running inside a Herdr-managed pane. Herdr owns the
+  // visible workspace even when child shells expose tmux-like environment.
+  new HerdrAdapter(),
   new TmuxAdapter(),
   new ZellijAdapter(),
   new CmuxAdapter(),
@@ -42,12 +47,13 @@ let cachedAdapter: TerminalAdapter | null = null;
  * Detect and return the appropriate terminal adapter for the current environment.
  *
  * Detection order (first match wins):
- * 1. tmux - if TMUX env is set
- * 2. Zellij - if ZELLIJ env is set and not in tmux
- * 3. cmux - if CMUX_SOCKET_PATH or CMUX_WORKSPACE_ID env is set
- * 4. iTerm2 - if TERM_PROGRAM=iTerm.app and not in tmux/zellij/cmux
- * 5. WezTerm - if WEZTERM_PANE env is set and not in tmux/zellij/cmux
- * 6. Windows - if platform is win32 and not in tmux/zellij/cmux/iTerm2/WezTerm
+ * 1. Herdr - if HERDR_ENV/HERDR_PANE_ID/HERDR_SOCKET_PATH are set
+ * 2. tmux - if TMUX env is set
+ * 3. Zellij - if ZELLIJ env is set and not in tmux
+ * 4. cmux - if CMUX_SOCKET_PATH or CMUX_WORKSPACE_ID env is set
+ * 5. iTerm2 - if TERM_PROGRAM=iTerm.app and not in tmux/zellij/cmux
+ * 6. WezTerm - if WEZTERM_PANE env is set and not in tmux/zellij/cmux
+ * 7. Windows - if platform is win32 and not in tmux/zellij/cmux/iTerm2/WezTerm
  *
  * @returns The detected terminal adapter, or null if none detected
  */
@@ -69,7 +75,7 @@ export function getTerminalAdapter(): TerminalAdapter | null {
 /**
  * Get a specific terminal adapter by name.
  *
- * @param name - The adapter name (e.g., "tmux", "zellij", "cmux", "iTerm2", "WezTerm", "Windows")
+ * @param name - The adapter name (e.g., "herdr", "tmux", "zellij", "cmux", "iTerm2", "WezTerm", "Windows")
  * @returns The adapter instance, or undefined if not found
  */
 export function getAdapterByName(name: string): TerminalAdapter | undefined {
@@ -109,9 +115,9 @@ export function hasTerminalAdapter(): boolean {
 }
 
 /**
- * Check if the current terminal supports spawning separate OS windows.
+ * Check if the current terminal supports spawning separate windows or terminal-native surfaces.
  *
- * @returns true if the detected terminal supports windows (iTerm2, WezTerm, Windows, cmux)
+ * @returns true if the detected terminal supports windows or equivalent isolated surfaces (Herdr tabs, iTerm2, WezTerm, Windows, cmux)
  */
 export function supportsWindows(): boolean {
   const adapter = getTerminalAdapter();
